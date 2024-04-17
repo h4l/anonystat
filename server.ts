@@ -23,7 +23,9 @@ import { GA4MP_URL } from "./constants.ts";
 // parser/proxier etc? This way each different request type can resolve to a
 // different type-safe proxier, rather than munging multiple into one.
 
-export type Error<NameT extends string, DetailsT = never> =
+type EmptyObject = Record<string | number | symbol, never>;
+
+export type Error<NameT extends string, DetailsT = unknown> =
   & { name: NameT }
   & DetailsT;
 // & (DetailsT extends undefined ? { details?: undefined }
@@ -46,33 +48,55 @@ export type PayloadParseError = Error<
   "invalid-ga4mp-payload",
   { zodError: z.ZodError }
 >; // FIXME
-export type ProxySendError = Error<"placeholder">; // FIXME
 
-export enum RequestName {
-  collect = "collect",
-}
+export type ProxySendErrorAborted = Error<"aborted", { message?: string }>;
+export type ProxySendErrorTimeout = Error<"timeout", { message?: string }>;
+export type ProxySendErrorIO = Error<"proxy-io-error", { message?: string }>;
+export type ProxySendErrorResponseStatus = Error<
+  "proxy-response-status",
+  { status: number }
+>;
+export type ProxySendError =
+  | ProxySendErrorAborted
+  | ProxySendErrorTimeout
+  | ProxySendErrorIO
+  | ProxySendErrorResponseStatus;
 
 /** Metadata on how an incoming Request matched a proxy route. */
 export interface RequestMeta {
   url: URL;
   headers: Headers;
-  name: string | null;
 }
 
+export type RequestMetaOptions<RequestMetaT> = { requestMeta: RequestMetaT };
+
+export type UnknownProxyOptions<M extends RequestMeta> = ProxyOptions<
+  UnknownPayload,
+  UnknownPayload,
+  unknown,
+  M,
+  unknown,
+  unknown,
+  unknown
+>;
+
 export type RequestMatcherResult<
-  T extends ProxyOptions<any, any, M>,
+  T extends UnknownProxyOptions<M>,
   M extends RequestMeta,
 > = { proxy: T; requestMeta: M };
 
+// FIXME: Do we need to provide a fn that receives the paired values?
+//   - I think we do...
 export type RequestMatcher<RequestMatchErrorT = RequestMatchError> = <
-  T extends ProxyOptions<any, any, M>,
-  M extends RequestMeta,
+  ResultT,
 >(
-  request: Request,
-  info: Deno.ServeHandlerInfo,
+  options: { request: Request; info: Deno.ServeHandlerInfo },
+  callback: <T extends UnknownProxyOptions<M>, M extends RequestMeta>(
+    match: RequestMatcherResult<T, M>,
+  ) => ResultT | Promise<ResultT>,
 ) =>
-  | Result<RequestMatcherResult<T, M>, RequestMatchErrorT>
-  | Promise<Result<RequestMatcherResult<T, M>, RequestMatchErrorT>>;
+  | Result<ResultT, RequestMatchErrorT>
+  | Promise<Result<ResultT, RequestMatchErrorT>>;
 
 /** Called to provide an HTTP response when the request is not a collect request. */
 export type FallbackHandler<RequestMatchErrorT = RequestMatchError> = (
@@ -85,56 +109,59 @@ export type FallbackHandler<RequestMatchErrorT = RequestMatchError> = (
  * Expected to be a GA4 mp request, but not validated, so could be any JSON
  * data.
  */
-export type GA4MPPayload<T, Optional = never> = {
+export type GA4MPPayload<T> = {
   payload: T;
-  api_secret: string | Optional;
-  measurement_id: string | Optional;
 };
-export type RawPayload = GA4MPPayload<unknown, null>;
+
+export type UnknownPayload = GA4MPPayload<unknown>;
 // export type ReadRequest<T, M> = {};
 
 // TODO: we can use the read result to hold custom request meta if needed, don't need separate meta type
 // TODO: should we pass matchinfo rather than requestmeta?
 export type RequestReader<
-  RawPayloadT extends GA4MPPayload<unknown, unknown> = RawPayload,
-  RequestReadErrorT = RequestReadError,
-  RequestMetaT extends RequestMeta = RequestMeta,
+  RawPayloadT extends UnknownPayload, // = RawPayload,
+  RequestReadErrorT, // = RequestReadError,
+  RequestMetaT extends RequestMeta, // = RequestMeta,
 > = (
   request: Request,
-  requestMeta: RequestMetaT,
+  options: RequestMetaOptions<RequestMetaT>,
 ) => Promise<Result<RawPayloadT, RequestReadErrorT>>;
 
 export type PayloadParser<
-  RawPayloadT extends GA4MPPayload<unknown, unknown>,
-  PayloadT extends GA4MPPayload<unknown, string>,
+  RawPayloadT extends UnknownPayload,
+  PayloadT extends UnknownPayload,
   PayloadParseErrorT = PayloadParseError,
   RequestMetaT extends RequestMeta = RequestMeta,
 > = (
   payload: RawPayloadT,
-  requestMeta: RequestMetaT,
+  options: RequestMetaOptions<RequestMetaT>,
 ) =>
   | Result<PayloadT, PayloadParseErrorT>
   | Promise<Result<PayloadT, PayloadParseErrorT>>;
 
+export type ProxySenderOptions<RequestMetaT> =
+  & RequestMetaOptions<RequestMetaT>
+  & { signal?: AbortSignal };
+
 export type ProxySender<
-  PayloadT extends GA4MPPayload<unknown, string>,
+  PayloadT extends UnknownPayload,
   ProxyResultT = void,
   ProxySendErrorT = ProxySendError,
   RequestMetaT extends RequestMeta = RequestMeta,
 > = (
   payload: PayloadT,
-  requestMeta: RequestMetaT,
+  options: ProxySenderOptions<RequestMetaT>,
 ) => Promise<Result<ProxyResultT, ProxySendErrorT>>;
 
 export type ResponseWriter<
-  PayloadT extends GA4MPPayload<unknown, string>,
+  PayloadT extends UnknownPayload,
   ProxyResultT,
   ErrorT,
   RequestMetaT extends RequestMeta = RequestMeta,
 > = (
   result: Result<{ payload: PayloadT; proxyResult: ProxyResultT }, ErrorT>,
-  requestMeta: RequestMetaT,
-) => Promise<Response>;
+  options: RequestMetaOptions<RequestMetaT>,
+) => Response | Promise<Response>;
 
 type HandlerOptions<RequestMatchErrorT = RequestMatchError> = {
   requestMatcher: RequestMatcher<RequestMatchErrorT>;
@@ -142,16 +169,13 @@ type HandlerOptions<RequestMatchErrorT = RequestMatchError> = {
 };
 
 type ProxyOptions<
-  RawPayloadT extends GA4MPPayload<unknown, unknown> = RawPayload,
-  PayloadT extends GA4MPPayload<unknown, string> = GA4MPPayload<
-    AnyPayload,
-    string
-  >,
-  ProxyResultT = void,
-  RequestMetaT extends RequestMeta = RequestMeta,
-  RequestReadErrorT = RequestReadError,
-  PayloadParseErrorT = PayloadParseError,
-  ProxySendErrorT = ProxySendError,
+  RawPayloadT extends UnknownPayload, // = RawPayload,
+  PayloadT extends UnknownPayload, // = GA4MPPayload<AnyPayload, string>,
+  ProxyResultT, // = void,
+  RequestMetaT extends RequestMeta, // = RequestMeta,
+  RequestReadErrorT, // = RequestReadError,
+  PayloadParseErrorT, // = PayloadParseError,
+  ProxySendErrorT, // = ProxySendError,
 > = {
   requestReader: RequestReader<RawPayloadT, RequestReadErrorT, RequestMetaT>;
   payloadParser: PayloadParser<
@@ -184,132 +208,43 @@ export function createHandler<HandlerOptionsT extends HandlerOptions>(
   { requestMatcher, fallbackHandler }: HandlerOptionsT,
 ): Deno.ServeHandler {
   return async (request: Request, info: Deno.ServeHandlerInfo) => {
-    const match = await requestMatcher(request, info);
-    if (!match.success) {
+    const result = await requestMatcher(
+      { request, info },
+      async ({ proxy, requestMeta }) => {
+        const readResult = await proxy.requestReader(request, { requestMeta });
+        if (!readResult.success) {
+          return await proxy.responseWriter(readResult, { requestMeta });
+        }
+
+        const parseResult = await proxy.payloadParser(
+          readResult.data,
+          { requestMeta },
+        );
+        if (!parseResult.success) {
+          return await proxy.responseWriter(parseResult, { requestMeta });
+        }
+
+        const proxyResult = await proxy.proxySender(
+          parseResult.data,
+          { requestMeta, signal: request.signal },
+        );
+        if (!proxyResult.success) {
+          return await proxy.responseWriter(proxyResult, { requestMeta });
+        }
+
+        return await proxy.responseWriter({
+          success: true,
+          data: { payload: parseResult.data, proxyResult: proxyResult.data },
+        }, { requestMeta });
+      },
+    );
+
+    if (!result.success) {
       return await fallbackHandler(request, {
         ...info,
-        requestMatchError: match.error,
+        requestMatchError: result.error,
       });
     }
-
-    return (async <RP, PP, R, M extends RequestMeta, E1, E2, E3>(
-      proxy: ProxyOptions<RP, PP, R, M, E1, E2, E3>,
-      requestMeta: M,
-    ): Promise<Response> => {
-      const readResult = await proxy.requestReader(request, requestMeta);
-      if (!readResult.success) {
-        return await proxy.responseWriter(readResult, requestMeta);
-      }
-
-      const parseResult = await proxy.payloadParser(
-        readResult.data,
-        requestMeta,
-      );
-      if (!parseResult.success) {
-        return await proxy.responseWriter(parseResult, requestMeta);
-      }
-
-      const proxyResult = await proxy.proxySender(
-        parseResult.data,
-        requestMeta,
-      );
-      if (!proxyResult.success) {
-        return await proxy.responseWriter(proxyResult, requestMeta);
-      }
-
-      return await proxy.responseWriter({
-        success: true,
-        data: { payload: parseResult.data, proxyResult: proxyResult.data },
-      }, requestMeta);
-    })(match.data.proxy, match.data.requestMeta);
+    return result.data;
   };
 }
-
-//RequestResolveResult | RequestRejectionResult;
-
-// interface RawRequest {
-//   api_secret: string | null;
-//   measurement_id: string | null;
-//   payload: unknown;
-// }
-
-// interface ApprovedRequest {
-//   api_secret: string;
-//   measurement_id: string;
-//   payload: AnyPayload;
-//   upstreamUrl?: string;
-// }
-
-// type RequestResolveResult = { success: true; data: ApprovedRequest };
-// type RequestRejection = { reason: string };
-// type RequestRejectionResult = {
-//   success: false;
-//   error: RequestRejection;
-// };
-
-// type RequestResolveFn = (
-//   rawRequest: RawRequest,
-// ) => RequestResolveResult | RequestRejectionResult;
-
-// async function handleProxyRequest({ rawRequest, resolver }: {
-//   rawRequest: RawRequest;
-//   resolver: RequestResolveFn;
-// }): Promise<Response> {
-//   const resolveResult = resolver(rawRequest);
-
-//   if (!resolveResult.success) {
-//     // TODO: define types for real error conditions
-//     return new Response(
-//       `Failed to proxy request: ${resolveResult.error.reason}`,
-//       { status: StatusCodes.IM_A_TEAPOT },
-//     );
-//   }
-
-//   await sendProxyRequest(resolveResult.data);
-//   return new Response(null, { status: StatusCodes.NO_CONTENT });
-// }
-
-// async function sendProxyRequest(
-//   request: ApprovedRequest,
-//   { signal }: { signal?: AbortSignal } = {},
-// ): Promise<void> {
-//   const url = new URL(request.upstreamUrl ?? GA4MP_URL);
-//   url.searchParams.set("api_secret", request.api_secret);
-//   url.searchParams.set("measurement_id", request.measurement_id);
-
-//   const body = JSON.stringify(request.payload);
-
-//   await fetch(url, { method: "POST", keepalive: true, body, signal });
-// }
-
-// type DefaultResolverOptions = { api_secret: string; measurement_id: string };
-
-// export function createDefaultResolver(
-//   options: DefaultResolverOptions,
-// ): RequestResolveFn {
-//   return (rawRequest) => {
-//     // TODO: pass URL and Headers in request?
-//     // use auth() fn to map URL/Headers to api_secret/measurement_id ?
-
-//     const result = AnyPayload.safeParse(rawRequest);
-//     if (!result.success) {
-//       return {
-//         success: false,
-//         error: {
-//           reason:
-//             `Request body is not a valid GA4 Measurement Protocol payload: ${
-//               Deno.inspect(result.error.issues)
-//             }`,
-//         },
-//       } satisfies RequestRejectionResult;
-//     }
-//     return {
-//       success: true,
-//       data: {
-//         api_secret: options.api_secret,
-//         measurement_id: options.measurement_id,
-//         payload: result.data,
-//       },
-//     } satisfies RequestResolveResult;
-//   };
-// }
