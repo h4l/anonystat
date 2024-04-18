@@ -159,7 +159,10 @@ export type ResponseWriter<
   ErrorT,
   RequestMetaT extends RequestMeta = RequestMeta,
 > = (
-  result: Result<{ payload: PayloadT; proxyResult: ProxyResultT }, ErrorT>,
+  result: Result<
+    { payload: PayloadT; proxyResult: ProxyResultT },
+    ErrorT
+  >,
   options: RequestMetaOptions<RequestMetaT>,
 ) => Response | Promise<Response>;
 
@@ -169,13 +172,13 @@ type HandlerOptions<RequestMatchErrorT = RequestMatchError> = {
 };
 
 type ProxyOptions<
-  RawPayloadT extends UnknownPayload, // = RawPayload,
-  PayloadT extends UnknownPayload, // = GA4MPPayload<AnyPayload, string>,
-  ProxyResultT, // = void,
-  RequestMetaT extends RequestMeta, // = RequestMeta,
-  RequestReadErrorT, // = RequestReadError,
-  PayloadParseErrorT, // = PayloadParseError,
-  ProxySendErrorT, // = ProxySendError,
+  RawPayloadT extends UnknownPayload,
+  PayloadT extends UnknownPayload,
+  ProxyResultT,
+  RequestMetaT extends RequestMeta,
+  RequestReadErrorT,
+  PayloadParseErrorT,
+  ProxySendErrorT,
 > = {
   requestReader: RequestReader<RawPayloadT, RequestReadErrorT, RequestMetaT>;
   payloadParser: PayloadParser<

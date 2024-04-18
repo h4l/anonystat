@@ -13,15 +13,15 @@ export function assertUnreachable(_value: never, message?: string): never {
  *
  * @param _value The subject of an if-else chain that is never after the if-else
  * handles all expected values.
- * @param reachedAtRuntime A function that is called at runtime if the static
+ * @param runtimeBehaviour A function that is called at runtime if the static
  * type constraints are violated.
- * @returns The result of reachedAtRuntime.
+ * @returns The result of runtimeBehaviour.
  */
-export function staticallyUnreachable<T>(
+export function unreachableAtCompileTime<T>(
   _value: never,
-  reachedAtRuntime: () => T,
+  runtimeBehaviour: () => T,
 ): T {
-  return reachedAtRuntime();
+  return runtimeBehaviour();
 }
 
 /** Check if an error is a [TimeoutError](https://developer.mozilla.org/en-US/docs/Web/API/DOMException#timeouterror), e.g. from `AbortSignal.timeout()`.
