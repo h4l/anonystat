@@ -36,3 +36,36 @@ export function hasMessage<T>(e: T): e is T & { message: string } {
   return e && typeof e === "object" &&
     typeof (e as MaybeMsg).message === "string";
 }
+
+export type Error<NameT extends string, DetailsT = unknown> =
+  & { name: NameT }
+  & DetailsT;
+
+export type SuccessResult<T> = { success: true; data: T };
+export type ErrorResult<E> = { success: false; error: E };
+export type Result<T, E> = SuccessResult<T> | ErrorResult<E>;
+
+export function mapResult<T, U, E>(
+  result: Result<T, E>,
+  transform: (value: T) => U,
+): Result<U, E> {
+  return result.success
+    ? { success: true, data: transform(result.data) }
+    : result;
+}
+
+export type MaybePromise<T> = T | Promise<T>;
+
+// deno-lint-ignore no-explicit-any
+export type SyncReturn<T extends (...args: any) => any> = (
+  ...args: Parameters<T>
+) => Awaited<ReturnType<T>>;
+
+// deno-lint-ignore no-explicit-any
+export type IfFn<T, Yes, No> = T extends ((...args: any) => any) ? Yes : No;
+
+export type MaybeLazy<T> = IfFn<T, never, T | (() => T)>;
+
+export function notLazy<T>(maybeLazy: MaybeLazy<T>): T {
+  return typeof maybeLazy === "function" ? maybeLazy() : maybeLazy;
+}

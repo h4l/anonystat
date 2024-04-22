@@ -1,6 +1,10 @@
-import { hasMessage, isTimeout, unreachableAtCompileTime } from "./_misc.ts";
-import { GA4MP_URL } from "./constants.ts";
-import { getReasonPhrase, StatusCodes, z } from "./deps.ts";
+import {
+  hasMessage,
+  isTimeout,
+  SyncReturn,
+  unreachableAtCompileTime,
+} from "./_misc.ts";
+import { StatusCodes, z } from "./deps.ts";
 import { AnyPayload } from "./payload-schemas.ts";
 import {
   PayloadParseError,
@@ -10,23 +14,25 @@ import {
   ProxySendErrorIO,
   ProxySendErrorResponseStatus,
   ProxySendErrorTimeout,
-  RequestMatcherResult,
-  RequestMatchError,
   ResponseWriter,
   UnknownPayload,
-  UnknownProxyOptions,
-} from "./server.ts";
+} from "./proxy.ts";
 import {
-  FallbackHandler,
   GA4MPPayload,
   PayloadParser,
-  RequestMatcher,
-  RequestMeta,
   RequestReader,
   RequestReadError,
-  Result,
-  SuccessResult,
-} from "./server.ts";
+} from "./proxy.ts";
+
+import { Result, SuccessResult } from "./_misc.ts";
+import { errorResponse } from "./requests.ts";
+import {
+  ApprovedCollectRequestMeta,
+  DebugRequestMeta,
+  MaybeCollectRequestMeta,
+  RequestMeta,
+  RequestName,
+} from "./meta.ts";
 
 /** Details of a GA4 data stream that Measurement Protocol can send events to. */
 export type GA4MPDestination = {
@@ -36,33 +42,13 @@ export type GA4MPDestination = {
   endpoint: string | URL;
 };
 
-export enum RequestName {
-  collect = "collect",
-  debugCollect = "debugCollect",
-}
-
-export interface DebugRequestMeta {
-  debug: boolean;
-}
-
-/** The metadata available from GA4 MP request URLs. */
-export interface CollectRequestMeta extends RequestMeta, DebugRequestMeta {
-  name: RequestName;
-  measurement_id: string | null;
-  api_secret: string | null;
-}
-export interface UnknownRequestMeta extends RequestMeta {
-  name: null;
-}
-export type MaybeCollectRequestMeta = CollectRequestMeta | UnknownRequestMeta;
-
 export type RequestMetaMatcher<RequestMetaT extends RequestMeta> = (
   request: Request,
   info: Deno.ServeHandlerInfo,
 ) => RequestMetaT | Promise<RequestMetaT>;
 
-export const matchDefaultGA4MPUrls: RequestMetaMatcher<
-  MaybeCollectRequestMeta
+export const matchDefaultGA4MPUrls: SyncReturn<
+  RequestMetaMatcher<MaybeCollectRequestMeta>
 > = (
   request: Request,
 ): MaybeCollectRequestMeta => {
@@ -84,130 +70,6 @@ export const matchDefaultGA4MPUrls: RequestMetaMatcher<
     debug: name === RequestName.debugCollect,
   };
 };
-
-export type CollectRequestApprover = (
-  request: CollectRequestMeta,
-) => ApprovedCollectRequestMeta | undefined;
-
-export type MeasurementIDRuleResolver = (
-  measurement_id: string | null,
-) => AllowListRule | undefined;
-
-export function createAllowListCollectRequestApprover(
-  { defaultAllowDebug, defaultEndpoint, ...options }: AllowedRequestMetaOptions,
-): CollectRequestApprover {
-  let measurementIdRuleResolver: MeasurementIDRuleResolver;
-
-  if ("allowedMeasurementIds" in options) {
-    const allowedMeasurementIds = options.allowedMeasurementIds;
-    measurementIdRuleResolver = (measurement_id) =>
-      measurement_id === null
-        ? undefined
-        : allowedMeasurementIds[measurement_id];
-  } else measurementIdRuleResolver = options.measurementIdRuleResolver;
-
-  return (request): ApprovedCollectRequestMeta | undefined => {
-    const rule = measurementIdRuleResolver(request.measurement_id);
-
-    if (
-      !((typeof rule?.allowedApiSecret === "string" &&
-        request.api_secret === rule.allowedApiSecret) ||
-        (typeof rule?.allowedApiSecret === "function" &&
-          rule.allowedApiSecret(request.api_secret)))
-    ) return undefined;
-
-    return {
-      url: request.url,
-      headers: request.headers,
-      name: request.name,
-      debug: !!((rule.allowDebug ?? defaultAllowDebug) && request.debug),
-      // Use Data Stream from allow list rule, not incoming request
-      measurement_id: rule.destination.measurement_id,
-      api_secret: rule.destination.api_secret,
-      endpoint: rule.destination.endpoint ?? defaultEndpoint ?? GA4MP_URL,
-    };
-  };
-}
-
-type AllowListRule = {
-  allowedApiSecret: string | ((api_secret: string | null) => boolean);
-  destination: {
-    api_secret: string;
-    measurement_id: string;
-    endpoint?: string;
-  };
-  allowDebug?: boolean;
-};
-
-export type AllowedRequestMetaOptions =
-  & (
-    | { allowedMeasurementIds: Record<string, AllowListRule> }
-    | { measurementIdRuleResolver: MeasurementIDRuleResolver }
-  )
-  & {
-    defaultEndpoint?: string;
-    defaultAllowDebug?: boolean;
-  };
-
-/** The metadata available from GA4 MP request URLs for known, allowed Data Stream. */
-export interface ApprovedCollectRequestMeta extends CollectRequestMeta {
-  measurement_id: string;
-  api_secret: string;
-  /** The GA4 MP API URL to send the payload to. */
-  endpoint: string;
-}
-
-export type MaybeAllowedCollectRequestMeta =
-  | ApprovedCollectRequestMeta
-  | UnknownRequestMeta;
-
-export function createAllowListRequestMetaMatcher(
-  options: AllowedRequestMetaOptions,
-): RequestMetaMatcher<MaybeAllowedCollectRequestMeta> {
-  const approveRequestMeta = createAllowListCollectRequestApprover(options);
-
-  return async (request, info) => {
-    const requestMeta = await matchDefaultGA4MPUrls(request, info);
-    if (requestMeta.name === null) return requestMeta;
-
-    return approveRequestMeta(requestMeta) ??
-      { name: null, url: requestMeta.url, headers: requestMeta.headers };
-  };
-}
-
-// TODO: need wrapper for this that validates measurement_id and api_secret and
-// does not match non-allowlisted ones.
-
-export type ProxyResolver<
-  ProxyOptionsT extends UnknownProxyOptions<RequestMetaT>,
-  RequestMetaT extends RequestMeta,
-> = (requestMeta: RequestMetaT) => ProxyOptionsT | null;
-
-export function createRequestMatcher<
-  ProxyOptionsT extends UnknownProxyOptions<RequestMetaT>,
-  RequestMetaT extends RequestMeta,
->(
-  requestMetaMatcher: RequestMetaMatcher<RequestMetaT>,
-  proxyResolver: ProxyResolver<ProxyOptionsT, RequestMetaT>,
-): RequestMatcher<RequestMatchError> {
-  return async <ResultT>(
-    { request, info }: { request: Request; info: Deno.ServeHandlerInfo },
-    callback: <T extends UnknownProxyOptions<M>, M extends RequestMeta>(
-      match: RequestMatcherResult<T, M>,
-    ) => ResultT | Promise<ResultT>,
-  ): Promise<Result<ResultT, RequestMatchError>> => {
-    const requestMeta = await requestMetaMatcher(request, info);
-    const proxy = proxyResolver(requestMeta);
-    if (proxy === null) {
-      return { success: false, error: { name: "proxy-not-found" } };
-    }
-    return { success: true, data: await callback({ proxy, requestMeta }) };
-  };
-}
-
-/** Handle requests for unknown URLs by responding with 404 Not Found. */
-export const defaultFallback: FallbackHandler = (_request, _info) =>
-  errorResponse(StatusCodes.NOT_FOUND);
 
 export const defaultRequestReader: RequestReader<
   UnknownPayload,
@@ -335,7 +197,7 @@ export function createPayloadParser<
   RequestMeta
 > {
   return (
-    payload,
+    { payload },
     _requestMeta,
   ) => {
     const result = payloadSchema.safeParse(payload);
@@ -517,29 +379,6 @@ export type GA4DataStream = {
   api_secret: string;
   measurement_id: string;
 };
-
-export function createSingleConfigProxyResolver<
-  ProxyOptionsT extends UnknownProxyOptions<RequestMetaT>,
-  RequestMetaT extends CollectRequestMeta,
->(
-  ga4DataStream: GA4DataStream,
-  proxyOptions: ProxyOptionsT | (() => ProxyOptionsT),
-): ProxyResolver<ProxyOptionsT, RequestMetaT> {
-  const callable = typeof proxyOptions === "function";
-  return (requestMeta) => {
-    if (
-      requestMeta.api_secret !== ga4DataStream.api_secret ||
-      requestMeta.measurement_id !== ga4DataStream.measurement_id
-    ) {
-      return null;
-    }
-    return callable ? proxyOptions() : proxyOptions;
-  };
-}
-
-export function errorResponse(status: StatusCodes, message?: string): Response {
-  return new Response(message ?? getReasonPhrase(status), { status });
-}
 
 const ContentType = z.string().transform((
   contentType: string,
