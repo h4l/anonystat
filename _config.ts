@@ -66,7 +66,7 @@ export function createForwarder(
   const rules = config.forward.flatMap((forwarder) => {
     const requestForwarder = new DefaultRequestForwarder(defaultProxyOptions);
     return forwarder.data_stream.map((data_stream) => {
-      const rule = new DefaultCollectRequestForwardingRule({
+      const rule = DefaultCollectRequestForwardingRule.create({
         allowedApiSecret: data_stream.in.api_secret,
         destination: {
           measurement_id: data_stream.out.measurement_id,

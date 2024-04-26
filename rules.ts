@@ -29,6 +29,7 @@ export interface CollectRequestForwardingRule<
 > {
   apply(
     requestMeta: CollectRequestMeta,
+    options: HandlerRequest,
   ): Result<MatchedCollectRequest<RequestMetaT>, RequestMatchErrorT>;
 }
 
@@ -67,28 +68,115 @@ export abstract class AbstractCollectRequestForwardingRule<
 
   protected abstract getMatchedRequestMeta(
     requestMeta: CollectRequestMeta,
+    options: HandlerRequest,
   ): Result<RequestMetaT, RequestMatchErrorT>;
 
   apply(
     requestMeta: CollectRequestMeta,
+    options: HandlerRequest,
   ): Result<
     MatchedCollectRequest<RequestMetaT>,
     RequestMatchErrorT
   > {
     return mapResult(
-      this.getMatchedRequestMeta(requestMeta),
+      this.getMatchedRequestMeta(requestMeta, options),
       (requestMeta) => ({ requestMeta, forwarder: notLazy(this.forwarder) }),
     );
   }
 }
 
-export class DefaultCollectRequestForwardingRule
-  extends AbstractCollectRequestForwardingRule<
-    CollectRequestMeta,
-    RequestMatchError
-  > {
+export type MatchedRequestMetaDecorator<
+  RequestMetaT extends ApprovedCollectRequestMeta,
+  MatchErrorT = RequestMatchError,
+> = (
+  matchResult: Result<ApprovedCollectRequestMeta, RequestMatchError>,
+  options: { requestMeta: CollectRequestMeta } & HandlerRequest,
+) => Result<RequestMetaT, RequestMatchError & MatchErrorT>;
+
+export type DefaultCollectRequestForwardingRuleOptions<
+  RequestMetaT extends ApprovedCollectRequestMeta,
+  MatchErrorT = RequestMatchError,
+> = CollectRequestRuleOptions<CollectRequestMeta> & {
+  decorator: MatchedRequestMetaDecorator<RequestMetaT, MatchErrorT>;
+};
+
+export class DefaultCollectRequestForwardingRule<
+  RequestMetaT extends ApprovedCollectRequestMeta = ApprovedCollectRequestMeta,
+  MatchErrorT = RequestMatchError,
+> extends AbstractCollectRequestForwardingRule<
+  RequestMetaT,
+  RequestMatchError & MatchErrorT
+> {
+  private readonly decorator: MatchedRequestMetaDecorator<
+    RequestMetaT,
+    MatchErrorT
+  >;
+
+  constructor(
+    { decorator, ...options }: DefaultCollectRequestForwardingRuleOptions<
+      RequestMetaT,
+      MatchErrorT
+    >,
+  ) {
+    super(options);
+    this.decorator = decorator;
+  }
+  static readonly noopDecorator: MatchedRequestMetaDecorator<
+    ApprovedCollectRequestMeta
+  > = (matchResult) => matchResult;
+
+  static create(
+    options: CollectRequestRuleOptions<CollectRequestMeta>,
+  ): DefaultCollectRequestForwardingRule;
+  static create<
+    RequestMetaT extends ApprovedCollectRequestMeta,
+    MatchErrorT = RequestMatchError,
+  >(
+    options: DefaultCollectRequestForwardingRuleOptions<
+      RequestMetaT,
+      MatchErrorT
+    >,
+  ): DefaultCollectRequestForwardingRule<RequestMetaT, MatchErrorT>;
+  static create<
+    RequestMetaT extends ApprovedCollectRequestMeta,
+    MatchErrorT = RequestMatchError,
+  >(
+    { decorator, ...options }:
+      | DefaultCollectRequestForwardingRuleOptions<
+        RequestMetaT,
+        MatchErrorT
+      >
+      | CollectRequestRuleOptions<CollectRequestMeta> & {
+        decorator: undefined;
+      },
+  ):
+    | DefaultCollectRequestForwardingRule<RequestMetaT, MatchErrorT>
+    | DefaultCollectRequestForwardingRule {
+    if (!decorator) {
+      return new DefaultCollectRequestForwardingRule(
+        {
+          decorator: DefaultCollectRequestForwardingRule.noopDecorator,
+          ...options,
+        },
+      );
+    }
+    return new DefaultCollectRequestForwardingRule<RequestMetaT, MatchErrorT>(
+      { decorator, ...options },
+    );
+  }
+
   protected getMatchedRequestMeta(
     requestMeta: CollectRequestMeta,
+    options: HandlerRequest,
+  ): Result<RequestMetaT, RequestMatchError & MatchErrorT> {
+    return this.decorator(
+      this.getDefaultMatchedRequestMeta(requestMeta, options),
+      { requestMeta, ...options },
+    );
+  }
+  protected getDefaultMatchedRequestMeta(
+    requestMeta: CollectRequestMeta,
+    _options: HandlerRequest,
   ): Result<ApprovedCollectRequestMeta, RequestMatchError> {
     if (
       !((typeof this.allowedApiSecret === "string" &&
@@ -171,7 +259,10 @@ export class MeasurementIdCollectRequestMatcher<
       | Result<MatchedCollectRequest<RequestMetaT>, RuleErrorT>
       | undefined;
     for (const forwardingRule of this.getForwardingRules(requestMeta)) {
-      lastForwarderResult = forwardingRule.apply(requestMeta);
+      lastForwarderResult = forwardingRule.apply(requestMeta, {
+        request,
+        info,
+      });
       if (lastForwarderResult.success) return lastForwarderResult;
     }
     if (lastForwarderResult) {
