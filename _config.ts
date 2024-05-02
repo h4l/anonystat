@@ -11,6 +11,8 @@ import { DefaultRequestForwarder, RequestMatchError } from "./proxy.ts";
 import { defaultProxyOptions } from "./default.ts";
 import { assertUnreachable, type Error, type Result } from "./_misc.ts";
 import { assert } from "./dev_deps.ts";
+import { ExistingIdPolicy, Lifetime, TimeUnit } from "./anonymisation.ts";
+import { GA4MP_URL } from "./constants.ts";
 
 const NonEmptyString = z.string().min(1);
 const DestinationUrl = z.string().url();
@@ -20,10 +22,7 @@ const DomainName = z.string().regex(
 );
 const Host = z.string().ip().or(DomainName);
 const Port = z.number().int().nonnegative();
-const ScramblerKey = z.string().min(12, {
-  message:
-    "Scrambler key must be at least 12 characters, ideally more like 48+. (To protect users' privacy it must provide enough randomness to not be brute-force guessable.)",
-});
+const ScramblerKey = z.string().min(1, { message: "Must not be empty" });
 
 const DataStreamCredentials = z.object({
   measurement_id: NonEmptyString,
@@ -40,26 +39,194 @@ export const DataStreamInOutShorthand = DataStreamCredentials.transform((
   ds,
 ): DataStreamInOut => ({ in: { ...ds }, out: { ...ds } })).or(DataStreamInOut);
 
+const UtcDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+  message: "Not a YYYY-MM-DD date",
+}).transform((dt, ctx) => {
+  const timestamp = Date.parse(`${dt}T00:00:00Z`);
+  if (Number.isNaN(timestamp)) {
+    ctx.addIssue({ code: "invalid_date", message: "Not a YYYY-MM-DD date" });
+    return z.NEVER;
+  }
+  return new Date(timestamp);
+});
+
+const UtcDateTime = z.string().datetime().pipe(z.coerce.date());
+
+const possibleTimeUnitMessage = Object.values(TimeUnit.Enum).join(", ");
+
+function parseLaxTimeUnit(value: string): TimeUnit | undefined {
+  const match = /(hour|day|week|month|quarter|year)s?/i.exec(value);
+  if (!match) return undefined;
+  return `${match[1].toLowerCase()}s` as TimeUnit;
+}
+
+const LaxTimeUnit = z.string().transform((s, ctx) => {
+  const timeUnit = parseLaxTimeUnit(s);
+  if (!timeUnit) {
+    ctx.addIssue({
+      code: "invalid_string",
+      message:
+        `Value must be one of ${possibleTimeUnitMessage} (ignoring case, with or without 's')`,
+      validation: "regex",
+    });
+    return z.NEVER;
+  }
+  return timeUnit;
+});
+
+const DEFAULT_LIFETIME_COUNT = 1;
+export const LifetimeObject = z.object({
+  count: z.number().int().nonnegative().default(DEFAULT_LIFETIME_COUNT),
+  unit: LaxTimeUnit,
+  from: z.union([UtcDate, UtcDateTime]).optional(),
+});
+
+type ParsedLifetimeExpression = {
+  expr: string;
+  lifetime: z.infer<typeof LifetimeObject>;
+};
+
+export const ParsedIsoIntervalLifetime = z.string().transform(
+  (val, ctx): ParsedLifetimeExpression => {
+    const match =
+      /^(?:R\/)?(\d{4}-\d{2}-\d{2})([T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)?\/P(?:(?:([1-9]\d*)([YMWD]))|(?:T([1-9]\d*)H))$/i
+        .exec(val);
+    if (!match) {
+      ctx.addIssue({
+        code: "invalid_string",
+        validation: "regex",
+        message: `Value is not an ISO 8601 interval with a single period`,
+      });
+      return z.NEVER;
+    }
+    assert(match.length === 6);
+    const [_, date, time, calCount, calUnit, timeCount] = match;
+
+    const from = Date.parse(`${date}${time || "T00:00:00Z"}`);
+    if (Number.isNaN(from)) {
+      ctx.addIssue({
+        code: "invalid_date",
+        "message": "Interval's date/time is invalid",
+      });
+      return z.NEVER;
+    }
+
+    let unit: TimeUnit;
+    let count: number;
+    if (calCount && timeCount) {
+      ctx.addIssue({
+        code: "invalid_string",
+        validation: "regex",
+        message: `Value is not an ISO 8601 interval with a single period`,
+      });
+      return z.NEVER;
+    } else if (calCount) {
+      const units = { Y: "years", M: "months", W: "weeks", D: "days" } as const;
+      unit = units[calUnit.toUpperCase() as keyof typeof units];
+      assert(unit);
+      count = Number.parseInt(calCount);
+    } else {
+      assert(timeCount);
+      count = Number.parseInt(timeCount);
+      unit = "hours";
+    }
+    return { expr: val, lifetime: { unit, count, from: new Date(from) } };
+  },
+);
+
+/** A string that parses to a Lifetime, like "day" "1 month", or "2 quarters". */
+const ParsedSimpleLifetimeExpression = z.string().transform(
+  (expr, ctx): ParsedLifetimeExpression => {
+    const match = /^(?:([1-9]\d*)\s*)?([a-zA-Z]+)$/.exec(expr.trim());
+    if (match) {
+      const count = Number.parseInt(match[1] || "1");
+      const unit = parseLaxTimeUnit(match[2]);
+      if (unit) {
+        const lifetime: z.infer<typeof LifetimeObject> = { count, unit };
+        return { expr, lifetime };
+      }
+    }
+    ctx.addIssue({
+      code: "invalid_string",
+      validation: "regex",
+      message:
+        `Value must be "[<number>] <unit>" where number is 1+ and unit is one of ${possibleTimeUnitMessage} (ignoring case, with or without 's')`,
+    });
+    return z.NEVER;
+  },
+);
+
+export const ParsedDisambiguatedLifetimeExpression = z.string().transform(
+  (arg, ctx): ParsedLifetimeExpression => {
+    if (/^\s*\d*\s*\w+\s*$/.test(arg)) {
+      const result = ParsedSimpleLifetimeExpression.safeParse(arg, ctx);
+      if (!result.success) {
+        for (const issue of result.error.issues) ctx.addIssue(issue);
+      } else {
+        return result.data;
+      }
+    } else {
+      const result = ParsedIsoIntervalLifetime.safeParse(arg, ctx);
+      if (!result.success) {
+        for (const issue of result.error.issues) ctx.addIssue(issue);
+      } else {
+        return result.data;
+      }
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'Value must be an interval like "2 weeks" or an ISO interval with a start time, like "R/2024-01-01/P2W"',
+    });
+    return z.NEVER;
+  },
+);
+
+export const EvaluatedDisambiguatedLifetimeExpression =
+  ParsedDisambiguatedLifetimeExpression
+    .transform(
+      (r) => r.lifetime,
+    );
+export const ValidatedDisambiguatedLifetimeExpression =
+  ParsedDisambiguatedLifetimeExpression
+    .transform(
+      (r) => r.expr,
+    );
+
+const DEFAULT_LIFETIME_UNIT: TimeUnit = "months";
+const DEFAULT_EXISTING_POLICY: ExistingIdPolicy =
+  ExistingIdPolicy.Enum.scramble;
+export const UserIdConfig = z.object({
+  scrambling_secret: ScramblerKey.nullable().default(null),
+  lifetime: LifetimeObject.or(EvaluatedDisambiguatedLifetimeExpression).default(
+    { unit: DEFAULT_LIFETIME_UNIT },
+  ),
+  existing: ExistingIdPolicy.default(DEFAULT_EXISTING_POLICY),
+});
+
 export const ForwarderConfig = z.object({
   data_stream: oneOrMore(DataStreamInOutShorthand),
-  destination: DestinationUrl.optional(),
-  allow_debug: z.boolean().optional().default(false),
-  secret_scrambler_key: ScramblerKey,
+  destination: DestinationUrl.default(GA4MP_URL),
+  allow_debug: z.boolean().default(false),
+  user_id: UserIdConfig.default({}),
 });
 type ForwarderConfig = z.infer<typeof ForwarderConfig>;
 
+const DEFAULT_PORT = 8000;
+const DEFAULT_HOSTNAME = "127.0.0.1";
 const ListenConfig = z.object({
-  port: Port.optional(),
-  hostname: Host.optional(),
+  port: Port.default(DEFAULT_PORT),
+  hostname: Host.default(DEFAULT_HOSTNAME),
 });
 
 export const Config = z.object({
   forward: oneOrMore(ForwarderConfig),
-  listen: ListenConfig.optional(),
+  listen: ListenConfig.default({}),
 });
 export type Config = z.infer<typeof Config>;
-type ConfigInput = z.input<typeof Config>;
+export type ConfigInput = z.input<typeof Config>;
 
+// TODO: create anonymisation components
 export function createForwarder(
   config: Config,
 ): Matcher<HandlerRequest, RequestMatchError, Responder> {
@@ -121,7 +288,14 @@ const _ConfigEnv = z.object({
   ANONYSTAT_DATA_STREAM_OUT_API_SECRET: EmptyStringAsUndefined.optional(),
   ANONYSTAT_DESTINATION: EmptyStringAsUndefined.pipe(DestinationUrl).optional(),
   ANONYSTAT_ALLOW_DEBUG: EmptyStringAsUndefined.pipe(EnvBool).optional(),
-  ANONYSTAT_SECRET_SCRAMBLER_KEY: EmptyStringAsUndefined.pipe(ScramblerKey),
+  ANONYSTAT_USER_ID_SCRAMBLING_SECRET: EmptyStringAsUndefined.pipe(
+    ScramblerKey,
+  ).optional(),
+  ANONYSTAT_USER_ID_LIFETIME: EmptyStringAsUndefined.pipe(
+    ValidatedDisambiguatedLifetimeExpression,
+  ).optional(),
+  ANONYSTAT_USER_ID_EXISTING: EmptyStringAsUndefined.pipe(ExistingIdPolicy)
+    .optional(),
   ANONYSTAT_LISTEN_PORT: EmptyStringAsUndefined.pipe(DecimalIntFromString).pipe(
     Port,
   ).optional(),
@@ -157,6 +331,7 @@ const ConfigEnv = _ConfigEnv.superRefine((val, ctx) => {
   );
 });
 export type ConfigEnv = z.infer<typeof ConfigEnv>;
+export type RawConfigEnv = z.input<typeof ConfigEnv>;
 
 /** Where a config was loaded from. */
 export type Source =
@@ -410,10 +585,16 @@ function loadConfigEnv(rawEnv: EnvMap): Result<Config, LoadConfigError> {
     hostname: env.ANONYSTAT_LISTEN_HOSTNAME || undefined,
   };
 
+  const user_id: z.input<typeof UserIdConfig> = {
+    lifetime: env.ANONYSTAT_USER_ID_LIFETIME,
+    existing: env.ANONYSTAT_USER_ID_EXISTING,
+    scrambling_secret: env.ANONYSTAT_USER_ID_SCRAMBLING_SECRET,
+  };
+
   const configInput: ConfigInput = {
     forward: {
       data_stream,
-      secret_scrambler_key: env.ANONYSTAT_SECRET_SCRAMBLER_KEY,
+      user_id,
       allow_debug: env.ANONYSTAT_ALLOW_DEBUG,
       destination: env.ANONYSTAT_DESTINATION || undefined,
     },
@@ -539,13 +720,57 @@ function simplifyDataStreamConfig(
   return { in: { ...value.in }, out: { ...value.out } };
 }
 
+function simplifyDateAsIsoFormat(value: Date): string {
+  const datetime = value.toISOString();
+  const date = datetime.split(/[ T]/)[0];
+  const isMidnightUtc = Date.parse(date) === value.getTime();
+  return isMidnightUtc ? date : datetime;
+}
+
+function simplifyLifetimeObject(
+  value: z.infer<typeof LifetimeObject>,
+): z.input<typeof LifetimeObject> | string | undefined {
+  let from: string | undefined;
+  if (value.from !== undefined && value.from.getTime() !== 0) {
+    from = simplifyDateAsIsoFormat(value.from);
+  }
+
+  const count: number | undefined = value.count === DEFAULT_LIFETIME_COUNT
+    ? undefined
+    : value.count;
+
+  const countIsPlural = count !== undefined && count > 1;
+  const unit: string = countIsPlural
+    ? value.unit
+    : value.unit.substring(0, value.unit.length - 1); // remove plural 's'
+
+  if (value.unit === DEFAULT_LIFETIME_UNIT && !from && !count) return undefined;
+  else if (from) return { count, unit, from };
+  // prefer "1 month" over "month"
+  return `${count || DEFAULT_LIFETIME_COUNT} ${unit}`;
+}
+
+function simplifyUserIdConfig(
+  value: z.infer<typeof UserIdConfig>,
+): z.input<typeof UserIdConfig> | undefined {
+  const lifetime = simplifyLifetimeObject(value.lifetime);
+
+  const existing = value.existing === DEFAULT_EXISTING_POLICY
+    ? undefined
+    : value.existing;
+  if (lifetime || value.scrambling_secret || existing) {
+    return { existing, lifetime, scrambling_secret: value.scrambling_secret };
+  }
+  return undefined;
+}
+
 function simplifyForwarderConfig(
   value: z.infer<typeof ForwarderConfig>,
 ): z.input<typeof ForwarderConfig> {
   const data_stream = value.data_stream.map(simplifyDataStreamConfig);
   return {
     data_stream: data_stream.length === 1 ? data_stream[0] : data_stream,
-    secret_scrambler_key: value.secret_scrambler_key,
+    user_id: value.user_id ? simplifyUserIdConfig(value.user_id) : undefined,
     allow_debug: value.allow_debug ? true : undefined,
     destination: value.destination,
   };
@@ -579,6 +804,21 @@ export type GetEnvarsError =
   | Error<"multiple-forward">
   | Error<"multiple-data-stream">;
 
+function formatIsoInterval(lifetime: z.input<typeof LifetimeObject>): string {
+  const from: string = typeof lifetime.from === "string"
+    ? lifetime.from
+    : simplifyDateAsIsoFormat(lifetime.from ?? new Date(0));
+
+  let period: string;
+  if (lifetime.unit === "hours") period = `PT${lifetime.count}H`;
+  else {
+    const isoUnit = lifetime.unit.substring(0, 1).toUpperCase();
+    period = `P${lifetime.count}${isoUnit}`;
+  }
+
+  return `R/${from}/${period}`;
+}
+
 /** Get the environment variable representation of a config, if possible. */
 export function getEnvars(config: Config): Result<ConfigEnv, GetEnvarsError> {
   const simplified = simplifyConfig(config);
@@ -591,8 +831,15 @@ export function getEnvars(config: Config): Result<ConfigEnv, GetEnvarsError> {
   }
   const data_stream = forward.data_stream;
 
+  const lifetime = typeof forward.user_id?.lifetime === "object"
+    ? formatIsoInterval(forward.user_id.lifetime)
+    : forward.user_id?.lifetime;
+
   const env: ConfigEnv = {
-    ANONYSTAT_SECRET_SCRAMBLER_KEY: forward.secret_scrambler_key,
+    ANONYSTAT_USER_ID_LIFETIME: lifetime,
+    ANONYSTAT_USER_ID_EXISTING: forward.user_id?.existing,
+    ANONYSTAT_USER_ID_SCRAMBLING_SECRET: forward.user_id?.scrambling_secret ??
+      undefined,
     ANONYSTAT_ALLOW_DEBUG: forward.allow_debug,
     ANONYSTAT_DESTINATION: forward.destination,
     ANONYSTAT_LISTEN_HOSTNAME: simplified.listen?.hostname,

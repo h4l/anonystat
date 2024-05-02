@@ -216,13 +216,15 @@ interface TimeBucket {
   getTimeBucket(time?: Date): string;
 }
 
-export type TimeUnit =
-  | "hours"
-  | "days"
-  | "weeks"
-  | "months"
-  | "quarters"
-  | "years";
+export const TimeUnit = z.enum([
+  "hours",
+  "days",
+  "weeks",
+  "months",
+  "quarters",
+  "years",
+]);
+export type TimeUnit = z.infer<typeof TimeUnit>;
 
 export type DefaultTimeBucketOptions = Lifetime;
 
@@ -405,15 +407,16 @@ interface UserIdAssigner<
   ): MaybePromise<void>;
 }
 
-/** How to handle payloads with `user_id` already present. */
-export enum ExistingIdPolicy {
-  /** Ignore the existing ID and generate a new one based on request attributes. */
-  replace = "replace",
-  /** Leave the existing ID in place, don't modify it. */
-  keep = "keep",
-  /** Transform the existing ID by hashing it into the request's ID namespace. */
-  namespace = "namespace",
-}
+/** How to handle payloads with `user_id` already present.
+ *
+ * - `replace`: Ignore the existing ID and generate a new one based on request
+ *    attributes.
+ * - `keep`: Leave the existing ID in place, don't modify it.
+ * - `scramble`: Transform the existing ID by hashing it into the request's ID
+ *    namespace.
+ */
+export const ExistingIdPolicy = z.enum(["replace", "keep", "scramble"]);
+export type ExistingIdPolicy = z.infer<typeof ExistingIdPolicy>;
 
 export type DefaultUserIdAssignerCreateOptions<
   RequestMetaT extends UserDistinctionRequestMeta,
@@ -450,7 +453,7 @@ export class DefaultUserIdAssigner<
   }
 
   static create<RequestMetaT extends UserDistinctionRequestMeta>(
-    { namespaceProvider, existingIdPolicy = ExistingIdPolicy.namespace }:
+    { namespaceProvider, existingIdPolicy = ExistingIdPolicy.Enum.scramble }:
       DefaultUserIdAssignerCreateOptions<RequestMetaT>,
   ): DefaultUserIdAssigner<UserIdPayload, RequestMetaT> {
     return new DefaultUserIdAssigner({
@@ -465,13 +468,16 @@ export class DefaultUserIdAssigner<
     payload: PayloadT,
     requestMeta: RequestMetaT,
   ): Promise<void> {
-    if (this.existingIdPolicy === ExistingIdPolicy.keep && payload.user_id) {
+    if (
+      this.existingIdPolicy === ExistingIdPolicy.Enum.keep && payload.user_id
+    ) {
       return;
     }
     const namespace = await this.namespaceProvider.getNamespace(requestMeta);
 
     if (
-      this.existingIdPolicy === ExistingIdPolicy.namespace && payload.user_id
+      this.existingIdPolicy === ExistingIdPolicy.Enum.scramble &&
+      payload.user_id
     ) {
       // Use the provided user id, but transform it by hashing it with our
       // namespace.
