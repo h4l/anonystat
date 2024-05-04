@@ -8,7 +8,8 @@ import {
   UnknownPayload,
 } from "./proxy.ts";
 import { AnyPayload } from "./payload-schemas.ts";
-import { assert, difference, generate, z } from "./deps.ts";
+import { assert, generate, z } from "./deps.ts";
+import { differenceUtc } from "./_datetime.ts";
 import { getDefaultKv } from "./storage.ts";
 
 type OneOrMore<T> = [T, ...T[]];
@@ -253,12 +254,13 @@ export class DefaultTimeBucket implements TimeBucket {
   }
 
   getTimeBucket(time: Date | undefined = new Date()): string {
-    const { [this.unit]: count } = difference(this.from, time, {
-      units: [this.unit],
-    });
-    assert(count !== undefined, "difference returned no value");
-    const bucket = Math.floor(count / this.count);
-    return `${this.unit}/${this.count}:${bucket}`;
+    // We divide time into buckets of unit * count width, and map time to an
+    // integer index, positive or negative. For 1 second buckets with from=0:
+    // ms time interval: [-2000, -1999][-1000, -1][0, 999][1000, 1999]
+    //     bucket index: [     -2     ][   -1    ][   0  ][    1     ]
+    const difference = differenceUtc(this.from, time, this.unit);
+    const bucketIndex = Math.floor(difference / this.count);
+    return `${this.unit}/${this.count}:${bucketIndex}`;
   }
 }
 

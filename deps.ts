@@ -4,12 +4,6 @@ export {
   assert,
   unreachable,
 } from "https://deno.land/std@0.221.0/assert/mod.ts";
-export {
-  difference,
-} from "https://deno.land/std@0.221.0/datetime/difference.ts";
-export type {
-  Unit,
-} from "https://deno.land/std@0.221.0/datetime/difference.ts";
 
 export { parse as parseJsonc } from "https://deno.land/std@0.221.0/jsonc/mod.ts";
 export type { JsonValue } from "https://deno.land/std@0.221.0/jsonc/mod.ts";
