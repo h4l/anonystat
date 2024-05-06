@@ -30,7 +30,7 @@ export const ROOT_NAMESPACE = "E0C52FDC-DE4C-408A-B03A-70BC4C836F54";
  * persistent cookies in the user's browser. To do this, we take a similar
  * approach to other analytics software, such as GoatCounter, Picwik
  */
-export class AnonymousUserDistinctionProvider {
+export class AnonymisationProvider {
   constructor(private readonly userIdAssigner: UserIdAssigner) {}
 
   /** Create components to create anonymous user_id values in payloads.
@@ -44,15 +44,16 @@ export class AnonymousUserDistinctionProvider {
    * @param options.userIdAssigner How to handle payloads with an existing user_id.
    */
   static async create(
-    { secret, lifetime, existingUserIdPolicy }: {
+    { secret, lifetime, existingUserIdPolicy, kv }: {
       secret?: string;
       lifetime?: Lifetime;
       existingUserIdPolicy?: ExistingIdPolicy;
+      kv?: Deno.Kv;
     } = {},
-  ): Promise<AnonymousUserDistinctionProvider> {
-    return new AnonymousUserDistinctionProvider(
+  ): Promise<AnonymisationProvider> {
+    return new AnonymisationProvider(
       DefaultUserIdAssigner.create({
-        namespaceProvider: await createNamespace({ secret, lifetime }),
+        namespaceProvider: await createNamespace({ secret, lifetime, kv }),
         existingIdPolicy: existingUserIdPolicy,
       }),
     );
@@ -230,9 +231,9 @@ export type TimeUnit = z.infer<typeof TimeUnit>;
 export type DefaultTimeBucketOptions = Lifetime;
 
 export class DefaultTimeBucket implements TimeBucket {
-  private readonly unit: TimeUnit;
-  private readonly count: number;
-  private readonly from: Date;
+  readonly unit: TimeUnit;
+  readonly count: number;
+  readonly from: Date;
   private readonly name: string;
 
   constructor(
@@ -245,7 +246,7 @@ export class DefaultTimeBucket implements TimeBucket {
     this.name = DefaultTimeBucket.buildName(this.from, this.unit, this.count);
   }
 
-  private static buildName(from: Date, unit: TimeUnit, count: number): string {
+  static buildName(from: Date, unit: TimeUnit, count: number): string {
     return `${from.toISOString()} ${unit}/${count}`;
   }
 
@@ -263,35 +264,6 @@ export class DefaultTimeBucket implements TimeBucket {
     return `${this.unit}/${this.count}:${bucketIndex}`;
   }
 }
-
-// export class MonthlyTimeBucket implements TimeBucket {
-//   getTimeBucket(time: Date = new Date()): string {
-//     const y = time.getUTCFullYear();
-//     const m = time.getUTCMonth() + 1;
-//     return `monthly:${y}-${m}`;
-//   }
-// }
-
-// export class DailyTimeBucket implements TimeBucket {
-//   public readonly midnightUtcOffset: number;
-//   constructor({ midnightUtcOffset = 0 }: { midnightUtcOffset?: number }) {
-//     if (midnightUtcOffset < 0) {
-//       throw new Error(
-//         `midnightUtcOffset must be positive: ${midnightUtcOffset}`,
-//       );
-//     }
-//     this.midnightUtcOffset = midnightUtcOffset;
-//   }
-
-//   getTimeBucket(time: Date = new Date()): string {
-//     const timeUtc = new Date(time.getTime() - this.midnightUtcOffset);
-//     const y = timeUtc.getUTCFullYear();
-//     const m = timeUtc.getUTCMonth() + 1;
-//     const d = timeUtc.getUTCDate();
-//     return `daily:${y}-${m}-${d}+${this.midnightUtcOffset}`;
-//   }
-// }
-
 const TaggedUuid = z.object({
   tag: z.string(),
   value: z.string().uuid(),
