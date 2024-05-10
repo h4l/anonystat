@@ -4,7 +4,9 @@ export {
   assertEquals,
   assertGreater,
   assertInstanceOf,
+  AssertionError,
   assertLess,
+  assertLessOrEqual,
   assertNotEquals,
   assertRejects,
   assertStringIncludes,
@@ -18,4 +20,9 @@ export {
   stub,
 } from "https://deno.land/std@0.221.0/testing/mock.ts";
 
+export type { Stub } from "https://deno.land/std@0.221.0/testing/mock.ts";
+
 export { FakeTime } from "https://deno.land/std@0.221.0/testing/time.ts";
+
+import { validate } from "https://deno.land/std@0.221.0/uuid/mod.ts";
+export const validateUuid = validate;
