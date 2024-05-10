@@ -4,7 +4,7 @@ export {
   assert,
   unreachable,
 } from "https://deno.land/std@0.221.0/assert/mod.ts";
-
+export { maxWith } from "https://deno.land/std@0.221.0/collections/max_with.ts";
 export { parse as parseJsonc } from "https://deno.land/std@0.221.0/jsonc/mod.ts";
 export type { JsonValue } from "https://deno.land/std@0.221.0/jsonc/mod.ts";
 export { generate } from "https://deno.land/std@0.221.0/uuid/v5.ts";

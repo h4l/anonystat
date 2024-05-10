@@ -17,6 +17,8 @@ import { HandlerRequest } from "./requests.ts";
 import { Matcher } from "./requests.ts";
 import { matchDefaultGA4MPUrls } from "./default.ts";
 import { assert } from "./dev_deps.ts";
+import { ErrorResult } from "./_misc.ts";
+import { maxWith } from "./deps.ts";
 
 export type MatchedCollectRequest<RequestMetaT extends CollectRequestMeta> = {
   requestMeta: RequestMetaT;
@@ -214,6 +216,27 @@ export type CollectRequestMatcher<
   MatchedCollectRequest<RequestMetaT>
 >;
 
+const requestMatchErrorPriority: Record<RequestMatchError["name"], number> = {
+  // highest priority as we were authenticated, but not authorised, so the
+  // authorisation failure is likely the most informative problem.
+  "not-authorised": 2,
+  "not-authenticated": 1, // mid as we were able to authenticate
+  "not-known-path": 0, // lowest as this didn't try to auth
+};
+
+/** Compare errors for significance. */
+export function compareRequestMatchError(
+  a: RequestMatchError,
+  b: RequestMatchError,
+): number {
+  return requestMatchErrorPriority[a.name] - requestMatchErrorPriority[b.name];
+}
+
+export type MeasurementIdCollectRequestMatcherOptions<RuleT, RuleErrorT> = {
+  defaultRule?: RuleT;
+  errorComparator?: (a: RuleErrorT, b: RuleErrorT) => number;
+};
+
 export class MeasurementIdCollectRequestMatcher<
   RequestMetaT extends CollectRequestMeta,
   RuleErrorT,
@@ -225,10 +248,11 @@ export class MeasurementIdCollectRequestMatcher<
   CollectRequestMatcher<CollectRequestMeta, RequestMatchError | RuleErrorT> {
   protected readonly rules: ReadonlyMap<string, readonly RuleT[]>;
   protected readonly defaultRule: RuleT | undefined;
+  protected readonly errorComparator: (a: RuleErrorT, b: RuleErrorT) => number;
 
   constructor(
     rules: Iterable<readonly [string, RuleT | [RuleT]]>,
-    options: { defaultRule?: RuleT } = {},
+    options: MeasurementIdCollectRequestMatcherOptions<RuleT, RuleErrorT> = {},
   ) {
     const index = new Map<string, RuleT[]>();
     for (const entry of rules) {
@@ -240,6 +264,7 @@ export class MeasurementIdCollectRequestMatcher<
     }
     this.rules = index;
     this.defaultRule = options.defaultRule;
+    this.errorComparator = options.errorComparator ?? (() => 0);
   }
 
   match(
@@ -255,21 +280,14 @@ export class MeasurementIdCollectRequestMatcher<
       return { success: false, error: { name: "not-known-path" } };
     }
 
-    let lastForwarderResult:
-      | Result<MatchedCollectRequest<RequestMetaT>, RuleErrorT>
-      | undefined;
+    const errors: ErrorResult<RuleErrorT>[] = [];
     for (const forwardingRule of this.getForwardingRules(requestMeta)) {
-      lastForwarderResult = forwardingRule.apply(requestMeta, {
-        request,
-        info,
-      });
-      if (lastForwarderResult.success) return lastForwarderResult;
+      const result = forwardingRule.apply(requestMeta, { request, info });
+      if (result.success) return result;
+      errors.push(result);
     }
-    if (lastForwarderResult) {
-      assert(!lastForwarderResult.success);
-      return lastForwarderResult;
-    }
-    return { success: false, error: { name: "not-authenticated" } };
+    return maxWith(errors, (a, b) => this.errorComparator(a.error, b.error)) ??
+      { success: false, error: { name: "not-authenticated" } };
   }
 
   protected *getForwardingRules(
