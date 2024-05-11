@@ -1,5 +1,5 @@
 let defaultKvPath: string | undefined;
-let defaultKv: Deno.Kv | undefined;
+let defaultKv: Promise<Deno.Kv> | undefined;
 
 export function configureDefaultKv(path: string | undefined) {
   if (defaultKv !== undefined) {
@@ -10,7 +10,14 @@ export function configureDefaultKv(path: string | undefined) {
 
 export async function getDefaultKv(): Promise<Deno.Kv> {
   if (defaultKv === undefined) {
-    defaultKv = await Deno.openKv(defaultKvPath);
+    defaultKv = Deno.openKv(defaultKvPath);
   }
-  return defaultKv;
+
+  const awaitedKv = defaultKv;
+  try {
+    return await awaitedKv;
+  } catch (e) {
+    if (awaitedKv === defaultKv) defaultKv = undefined;
+    throw e;
+  }
 }
