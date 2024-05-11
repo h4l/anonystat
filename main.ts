@@ -1,23 +1,47 @@
-import { ConfigEnvars } from "./config.ts";
-import { EnvBool } from "./_config.ts";
-import { createForwarder, loadConfigOrExit } from "./config.ts";
+import {
+  Config,
+  ConfigEnvars,
+  createCollectRequestMatcherFromConfig,
+  EnvBool,
+  loadConfigOrExit,
+  simplifyConfig,
+} from "./config.ts";
 import { createRequestMatcherHandler } from "./requests.ts";
-import { simplifyConfig } from "./_config.ts";
 
-async function main() {
-  const config = await loadConfigOrExit();
-
+function onConfigLoaded(config: Config): void {
   if (EnvBool.parse(Deno.env.get(ConfigEnvars.show_config) ?? "")) {
     console.log("Server starting with config:");
     console.log(JSON.stringify(simplifyConfig(config), undefined, 2));
   }
+}
 
-  Deno.serve({
-    port: config.listen?.port,
-    hostname: config.listen?.hostname,
-  }, createRequestMatcherHandler(createForwarder(config)));
+export type LoadConfigAndServeOptions = {
+  signal?: AbortSignal;
+  onConfigLoaded?: (config: Config) => void;
+  kv?: Deno.Kv;
+};
+
+/** Load configuration from environment variables and run the proxy server.
+ *
+ * The process exits if the config fails to load. (This is intended to be run
+ * from the process's main entrypoint.)
+ */
+export async function loadConfigAndServe(
+  { onConfigLoaded: onConfigLoaded_ = onConfigLoaded, signal, kv }:
+    LoadConfigAndServeOptions = {},
+): Promise<Deno.HttpServer<Deno.NetAddr>> {
+  const config = await loadConfigOrExit();
+  onConfigLoaded_(config);
+
+  const matcher = await createCollectRequestMatcherFromConfig(config, { kv });
+  const handler = createRequestMatcherHandler(matcher);
+
+  return Deno.serve(
+    { port: config.listen.port, hostname: config.listen.hostname, signal },
+    handler,
+  );
 }
 
 if (import.meta.main) {
-  await main();
+  await loadConfigAndServe();
 }
