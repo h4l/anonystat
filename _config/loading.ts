@@ -377,18 +377,21 @@ function formatZodError(
   }).join("\n");
 }
 
-export type LoadConfigOrExitOptions = LoadConfigOptions & {
-  exitStatus?: number;
-};
-
-/** Load & validate a config, or log an error and terminate the process. */
-export async function loadConfigOrExit(
-  { exitStatus = 1, ...options }: LoadConfigOrExitOptions = {},
+/** Load & validate a config, or throw {@linkcode ConfigLoadFailed}. */
+export async function loadConfigOrThrow(
+  options: LoadConfigOptions = {},
 ): Promise<Config> {
   const configLoad = await loadConfig(options);
   if (!configLoad.success) {
-    console.error(formatLoadConfigError(configLoad.error));
-    Deno.exit(exitStatus);
+    throw new ConfigLoadFailed(configLoad.error);
   }
   return configLoad.data;
+}
+
+/** Thrown when {@linkcode loadConfigOrThrow} fails to load the {@linkcode Config}.  */
+export class ConfigLoadFailed extends Error {
+  readonly name = "ConfigLoadFailed";
+  constructor(readonly loadConfigError: LoadConfigError) {
+    super(formatLoadConfigError(loadConfigError));
+  }
 }

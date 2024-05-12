@@ -1,7 +1,12 @@
 export { Config } from "./json_schema.ts";
 
-export type { LoadConfigOptions, LoadConfigOrExitOptions } from "./loading.ts";
-export { ConfigSource, loadConfig, loadConfigOrExit } from "./loading.ts";
+export type { LoadConfigError, LoadConfigOptions } from "./loading.ts";
+export {
+  ConfigLoadFailed,
+  ConfigSource,
+  loadConfig,
+  loadConfigOrThrow,
+} from "./loading.ts";
 
 export { ConfigEnv, ConfigEnvars, EnvBool } from "./env_schema.ts";
 

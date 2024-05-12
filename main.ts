@@ -3,7 +3,7 @@ import {
   ConfigEnvars,
   createCollectRequestMatcherFromConfig,
   EnvBool,
-  loadConfigOrExit,
+  loadConfigOrThrow,
   simplifyConfig,
 } from "./config.ts";
 import { createRequestMatcherHandler } from "./requests.ts";
@@ -30,7 +30,7 @@ export async function loadConfigAndServe(
   { onConfigLoaded: onConfigLoaded_ = onConfigLoaded, signal, kv }:
     LoadConfigAndServeOptions = {},
 ): Promise<Deno.HttpServer<Deno.NetAddr>> {
-  const config = await loadConfigOrExit();
+  const config = await loadConfigOrThrow();
   onConfigLoaded_(config);
 
   const matcher = await createCollectRequestMatcherFromConfig(config, { kv });

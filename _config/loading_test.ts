@@ -1,10 +1,11 @@
 import { Config, ConfigInput } from "./json_schema.ts";
 import { ConfigEnvars, RawConfigEnv } from "./env_schema.ts";
 import {
+  ConfigLoadFailed,
   ConfigSource,
   EnvMap,
   loadConfig,
-  loadConfigOrExit,
+  loadConfigOrThrow,
 } from "./loading.ts";
 
 import { assertSuccessful, assertUnsuccessful } from "../_testing.ts";
@@ -360,9 +361,9 @@ Deno.test("loadConfig()", async (t) => {
   });
 });
 
-Deno.test("loadConfigOrExit()", async (t) => {
+Deno.test("loadConfigOrThrow()", async (t) => {
   await t.step("loads valid config", async () => {
-    const config = await loadConfigOrExit({
+    const config = await loadConfigOrThrow({
       env: envMap({
         ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "a",
         ANONYSTAT_DATA_STREAM_API_SECRET: "b",
@@ -371,24 +372,21 @@ Deno.test("loadConfigOrExit()", async (t) => {
     assertEquals(config.forward[0].data_stream[0].in.measurement_id, "a");
   });
 
-  await t.step("exists on invalid config", async () => {
+  await t.step("throws on invalid config", async () => {
     let error: unknown;
     try {
-      await loadConfigOrExit({
-        env: envMap({}),
-        exitStatus: 2,
-      });
+      await loadConfigOrThrow({ env: envMap({}) });
     } catch (e) {
       error = e;
     }
-    assertInstanceOf(error, Error);
+    assertInstanceOf(error, ConfigLoadFailed);
     assertStringIncludes(
       error.message,
-      "Test case attempted to exit with exit code: 2",
+      "Failed to read environment variable",
     );
   });
 
-  await t.step("prints messages describing config error", async (t) => {
+  await t.step("error message describes config error", async (t) => {
     const getDefaultConfig = () => ({
       forward: {
         data_stream: {
@@ -431,22 +429,17 @@ Deno.test("loadConfigOrExit()", async (t) => {
     };
 
     const triggerLoadConfigError = async (env: EnvMap): Promise<string> => {
-      let stderrOutput = "";
-      const errorStub = stub(console, "error", (...args: unknown[]) => {
-        stderrOutput += args.map(String).join(" ") + "\n";
-      });
       let error: unknown;
 
       try {
-        await loadConfigOrExit({ env });
+        await loadConfigOrThrow({ env });
       } catch (e) {
         error = e;
       }
 
-      errorStub.restore();
-      assertInstanceOf(error, Error);
-      assertNotEquals(stderrOutput, "");
-      return stderrOutput;
+      assertInstanceOf(error, ConfigLoadFailed);
+      assertNotEquals(error.message, "");
+      return error.message;
     };
 
     await t.step("config value envars invalid", async (t) => {

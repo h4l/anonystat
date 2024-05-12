@@ -1,9 +1,10 @@
 import { assertUnreachable, Result } from "../_misc.ts";
 import {
   Config,
+  ConfigLoadFailed,
   ConfigSource,
   getEnvars,
-  loadConfigOrExit,
+  loadConfigOrThrow,
   simplifyConfig,
 } from "../config.ts";
 import { ConfigEnvars } from "../config.ts";
@@ -51,6 +52,18 @@ function parseArguments(argv: string[]) {
     string: stringArgs,
   });
   return Arguments.safeParse({ ...args, file: args._ });
+}
+
+async function loadConfigOrExit({ exitStatus }: { exitStatus?: number } = {}) {
+  try {
+    return await loadConfigOrThrow();
+  } catch (e) {
+    if (e instanceof ConfigLoadFailed) {
+      console.error(e.message);
+      Deno.exit(exitStatus ?? 1);
+    }
+    throw e; // unexpected error
+  }
 }
 
 async function main() {

@@ -1,47 +1,31 @@
 export const snapshot = {};
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > config value envars invalid > no envars set 1`] = `
+snapshot[`loadConfigOrThrow() > error message describes config error > config value envars invalid > no envars set 1`] = `
 "Failed to read environment variable ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: Required because ANONYSTAT_DATA_STREAM_MEASUREMENT_ID is not set
 Failed to read environment variable ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: Required because ANONYSTAT_DATA_STREAM_MEASUREMENT_ID is not set
 Failed to read environment variable ANONYSTAT_DATA_STREAM_IN_API_SECRET: Required because ANONYSTAT_DATA_STREAM_API_SECRET is not set
-Failed to read environment variable ANONYSTAT_DATA_STREAM_OUT_API_SECRET: Required because ANONYSTAT_DATA_STREAM_API_SECRET is not set
-"
+Failed to read environment variable ANONYSTAT_DATA_STREAM_OUT_API_SECRET: Required because ANONYSTAT_DATA_STREAM_API_SECRET is not set"
 `;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > config value envars invalid > invalid envar value 1`] = `
+snapshot[`loadConfigOrThrow() > error message describes config error > config value envars invalid > invalid envar value 1`] = `
 'Failed to read environment variable ANONYSTAT_USER_ID_LIFETIME: Value is not an ISO 8601 interval with a single period; Value must be an interval like "2 weeks" or an ISO interval with a start time, like "R/2024-01-01/P2W"
-Failed to read environment variable ANONYSTAT_DATA_STREAM_OUT_API_SECRET: Required because ANONYSTAT_DATA_STREAM_API_SECRET is not set
-'
+Failed to read environment variable ANONYSTAT_DATA_STREAM_OUT_API_SECRET: Required because ANONYSTAT_DATA_STREAM_API_SECRET is not set'
 `;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > config meta envars invalid > invalid source 1`] = `
-"Failed to read environment variable ANONYSTAT_CONFIG_SOURCE: Invalid enum value. Expected 'env' | 'json' | 'file', received 'sfsd'
-"
-`;
+snapshot[`loadConfigOrThrow() > error message describes config error > config meta envars invalid > invalid source 1`] = `"Failed to read environment variable ANONYSTAT_CONFIG_SOURCE: Invalid enum value. Expected 'env' | 'json' | 'file', received 'sfsd'"`;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > config meta envars invalid > missing source 1`] = `
-"Failed to read environment variable ANONYSTAT_CONFIG: No JSON value is set but config source is 'json'
-"
-`;
+snapshot[`loadConfigOrThrow() > error message describes config error > config meta envars invalid > missing source 1`] = `"Failed to read environment variable ANONYSTAT_CONFIG: No JSON value is set but config source is 'json'"`;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > invalid value in config JSON > forward.allow_debug 1`] = `
+snapshot[`loadConfigOrThrow() > error message describes config error > invalid value in config JSON > forward.allow_debug 1`] = `
 "Failed to load configuration from ANONYSTAT_CONFIG environment variable: Config contains invalid values:
-  forward.allow_debug: Expected boolean, received string
-"
+  forward.allow_debug: Expected boolean, received string"
 `;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > invalid value in config JSON > forward[].allow_debug 1`] = `
+snapshot[`loadConfigOrThrow() > error message describes config error > invalid value in config JSON > forward[].allow_debug 1`] = `
 "Failed to load configuration from ANONYSTAT_CONFIG environment variable: Config contains invalid values:
-  forward[0].allow_debug: Expected boolean, received string
-"
+  forward[0].allow_debug: Expected boolean, received string"
 `;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > file unreadable 1`] = `
-"Failed to load configuration from file './data' (via ANONYSTAT_CONFIG_FILE environment variable): Could not read file: Is a directory (os error 21): readfile './data'
-"
-`;
+snapshot[`loadConfigOrThrow() > error message describes config error > file unreadable 1`] = `"Failed to load configuration from file './data' (via ANONYSTAT_CONFIG_FILE environment variable): Could not read file: Is a directory (os error 21): readfile './data'"`;
 
-snapshot[`loadConfigOrExit() > prints messages describing config error > file jsonc invalid 1`] = `
-"Failed to load configuration from file './data/syntax_error.json' (via ANONYSTAT_CONFIG_FILE environment variable): Config has a JSON/JSONC syntax error: Unexpected end of JSONC input
-"
-`;
+snapshot[`loadConfigOrThrow() > error message describes config error > file jsonc invalid 1`] = `"Failed to load configuration from file './data/syntax_error.json' (via ANONYSTAT_CONFIG_FILE environment variable): Config has a JSON/JSONC syntax error: Unexpected end of JSONC input"`;
