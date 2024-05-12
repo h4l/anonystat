@@ -8,6 +8,20 @@ export type RequestMatchError =
   | Error<"not-authenticated">
   | Error<"not-authorised">;
 
+/** The names of possible errors that occur while forwarding a request after
+ * it's matched. */
+export const MatchedErrorNames = z.enum([
+  "aborted",
+  "body-not-valid-json",
+  "incorrect-content-type",
+  "incorrect-request-method",
+  "invalid-ga4mp-payload",
+  "proxy-io-error",
+  "proxy-response-status",
+  "request-io-error",
+  "timeout",
+]);
+
 export type RequestReadError =
   | Error<"incorrect-request-method">
   | Error<"incorrect-content-type">
