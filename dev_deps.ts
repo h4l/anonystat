@@ -26,3 +26,5 @@ export { FakeTime } from "https://deno.land/std@0.221.0/testing/time.ts";
 
 import { validate } from "https://deno.land/std@0.221.0/uuid/mod.ts";
 export const validateUuid = validate;
+
+export { toText } from "https://deno.land/std@0.221.0/streams/mod.ts";

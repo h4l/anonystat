@@ -1,0 +1,13 @@
+export const snapshot = {};
+
+snapshot[`defaultResponseWriter() > invalid-ga4mp-payload response > contains details of error in debug mode 1`] = `
+'Request body is not a valid GA4 Measurement Protocol payload: [
+  {
+    code: "invalid_type",
+    expected: "string",
+    received: "array",
+    path: [ "user_id" ],
+    message: "Must be a string"
+  }
+]'
+`;
