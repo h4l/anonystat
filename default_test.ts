@@ -36,7 +36,7 @@ import {
   ProxySendError,
   RequestReadError,
   UnknownPayload,
-} from "./proxy.ts";
+} from "./types.ts";
 
 Deno.test("matchDefaultGA4MPUrls()", async (t) => {
   const info: Deno.ServeHandlerInfo = {

@@ -6,7 +6,7 @@ import {
   PayloadParser,
   RequestMatchError,
   UnknownPayload,
-} from "./proxy.ts";
+} from "./types.ts";
 import { AnyPayload } from "./payload-schemas.ts";
 import { assert, generate, z } from "./deps.ts";
 import { differenceUtc } from "./_datetime.ts";

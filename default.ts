@@ -19,13 +19,13 @@ import {
   RequestForwarder,
   ResponseWriter,
   UnknownPayload,
-} from "./proxy.ts";
+} from "./types.ts";
 import {
   GA4MPPayload,
   PayloadParser,
   RequestReader,
   RequestReadError,
-} from "./proxy.ts";
+} from "./types.ts";
 
 import { Result, SuccessResult } from "./_misc.ts";
 import { errorResponse } from "./requests.ts";

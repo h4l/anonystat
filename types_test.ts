@@ -3,7 +3,7 @@ import {
   PayloadParseError,
   ProxySendError,
   RequestReadError,
-} from "./proxy.ts";
+} from "./types.ts";
 
 Deno.test("DefaultErrorNames", () => {
   type ExpectedErrorName =

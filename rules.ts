@@ -6,7 +6,7 @@ import {
   Result,
 } from "./_misc.ts";
 import { GA4MP_URL } from "./constants.ts";
-import { RequestForwarder, RequestMatchError } from "./proxy.ts";
+import { RequestForwarder, RequestMatchError } from "./types.ts";
 import {
   ApprovedCollectRequestMeta,
   CollectRequestMeta,

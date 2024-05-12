@@ -1,6 +1,6 @@
 import { MaybePromise, Result } from "./_misc.ts";
 import { getReasonPhrase, StatusCodes } from "./deps.ts";
-import { RequestMatchError } from "./proxy.ts";
+import { RequestMatchError } from "./types.ts";
 
 // TODO: could change the APi to make match return an iterator that yields 0+
 // results until an error
