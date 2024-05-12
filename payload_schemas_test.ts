@@ -1,11 +1,8 @@
-import { assertEquals } from "./dev_deps.ts";
-
-import { AnyEvent, ParameterValue, UserProperties } from "./payload-schemas.ts";
+import { AnyEvent, ParameterValue, UserProperties } from "./payload_schemas.ts";
 import { repeat, repeatString, SchemaAssertions } from "./test-utils.ts";
-import { ParameterName } from "./payload-schemas.ts";
-import { EventName } from "./payload-schemas.ts";
-import { AnyItem, AnyPayload } from "./payload-schemas.ts";
-import { z } from "./deps.ts";
+import { ParameterName } from "./payload_schemas.ts";
+import { EventName } from "./payload_schemas.ts";
+import { AnyItem, AnyPayload } from "./payload_schemas.ts";
 
 Deno.test("ParameterValue", () => {
   const sa = new SchemaAssertions(ParameterValue);

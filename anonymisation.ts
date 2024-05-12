@@ -7,7 +7,7 @@ import {
   RequestMatchError,
   UnknownPayload,
 } from "./types.ts";
-import { AnyPayload } from "./payload-schemas.ts";
+import { AnyPayload } from "./payload_schemas.ts";
 import { assert, generate, z } from "./deps.ts";
 import { differenceUtc } from "./_datetime.ts";
 import { getDefaultKv } from "./storage.ts";

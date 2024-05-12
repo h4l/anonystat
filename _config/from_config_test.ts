@@ -9,7 +9,7 @@ import {
   MpCollectRequestAttrs,
 } from "../_testing.ts";
 import { assertEquals, assertNotEquals, FakeTime, stub } from "../dev_deps.ts";
-import { AnyPayload } from "../payload-schemas.ts";
+import { AnyPayload } from "../payload_schemas.ts";
 import { HandlerRequest } from "../requests.ts";
 import { createCollectRequestMatcherFromConfig } from "./from_config.ts";
 import { Config } from "./json_schema.ts";

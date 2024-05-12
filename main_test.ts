@@ -3,7 +3,7 @@ import { ConfigEnvars, ConfigSource } from "./config.ts";
 import { StatusCodes } from "./deps.ts";
 import { assertEquals, stub } from "./dev_deps.ts";
 import { loadConfigAndServe } from "./main.ts";
-import { AnyPayload } from "./payload-schemas.ts";
+import { AnyPayload } from "./payload_schemas.ts";
 import { assertUuid } from "./_testing.ts";
 
 Deno.test("main()", async () => {

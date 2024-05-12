@@ -5,7 +5,7 @@ import {
   unreachableAtCompileTime,
 } from "./_misc.ts";
 import { StatusCodes, z } from "./deps.ts";
-import { AnyPayload } from "./payload-schemas.ts";
+import { AnyPayload } from "./payload_schemas.ts";
 import {
   ForwardAndRespondOptions,
   PayloadParseError,

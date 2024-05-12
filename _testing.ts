@@ -10,7 +10,7 @@ import {
   validateUuid,
 } from "./dev_deps.ts";
 import { assertFalse } from "https://deno.land/std@0.221.0/assert/assert_false.ts";
-import { AnyPayload } from "./payload-schemas.ts";
+import { AnyPayload } from "./payload_schemas.ts";
 import { assertGreater } from "./dev_deps.ts";
 
 /** Parse an iso date and return it as a ms timestamp, throw on invalid syntax. */

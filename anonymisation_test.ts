@@ -22,7 +22,7 @@ import {
   RequestMeta,
   RequestName,
 } from "./meta.ts";
-import { AnyPayload } from "./payload-schemas.ts";
+import { AnyPayload } from "./payload_schemas.ts";
 import { GA4MPPayload, PayloadParseError, PayloadParser } from "./types.ts";
 import { DefaultCollectRequestForwardingRule } from "./rules.ts";
 
