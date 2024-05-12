@@ -1,0 +1,5 @@
+.*
+!.gitignore
+*.lcov
+/cov_profile
+/html_cov
