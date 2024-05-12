@@ -152,3 +152,11 @@ async function getRequestPayload(request: Request): Promise<AnyPayload> {
     );
   }
 }
+
+export function ignoredRejectedPromise(
+  reason: unknown = "not used",
+): Promise<void> {
+  const completed = Promise.reject(reason);
+  completed.catch(() => {}); // ignore
+  return completed;
+}

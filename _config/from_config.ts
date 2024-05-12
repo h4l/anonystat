@@ -5,8 +5,8 @@ import {
   DefaultCollectRequestForwardingRule,
   MeasurementIdCollectRequestMatcher,
 } from "../rules.ts";
-import { DefaultRequestForwarder, RequestMatchError } from "../proxy.ts";
-import { defaultProxyOptions } from "../default.ts";
+import { RequestMatchError } from "../proxy.ts";
+import { defaultProxyOptions, DefaultRequestForwarder } from "../default.ts";
 import { Config } from "./json_schema.ts";
 import { AnonymisationProvider } from "../anonymisation.ts";
 

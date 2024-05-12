@@ -1,11 +1,18 @@
 import { ErrorResult } from "./_misc.ts";
-import { assertSuccessful, assertUnsuccessful } from "./_testing.ts";
+import {
+  assertSuccessful,
+  assertUnsuccessful,
+  assertUuid,
+  ignoredRejectedPromise,
+} from "./_testing.ts";
 import {
   approvedRequestDestinationSelector,
   createPayloadParser,
   createProxySender,
   defaultPayloadParser,
+  defaultProxyOptions,
   defaultProxySender,
+  DefaultRequestForwarder,
   defaultRequestReader,
   defaultResponseWriter,
   GA4MPDestination,
@@ -32,11 +39,8 @@ import {
 } from "./proxy.ts";
 
 Deno.test("matchDefaultGA4MPUrls()", async (t) => {
-  const completed = Promise.reject("not used");
-  completed.catch(() => {}); // ignore
-
   const info: Deno.ServeHandlerInfo = {
-    completed,
+    completed: ignoredRejectedPromise(),
     remoteAddr: { hostname: "example", port: 12345, transport: "tcp" },
   };
 
@@ -545,5 +549,100 @@ Deno.test("defaultProxySender()", async (t) => {
     validPayload: {
       payload: { client_id: "test", events: [] } satisfies AnyPayload,
     },
+  });
+});
+
+Deno.test("DefaultRequestForwarder", async (t) => {
+  const forwarder = new DefaultRequestForwarder(defaultProxyOptions);
+
+  const requestMeta: ApprovedCollectRequestMeta = {
+    url: new URL("https://example.com/mp/collect"),
+    headers: new Headers(),
+    name: RequestName.collect,
+    debug: false,
+    measurement_id: "exampleId",
+    api_secret: "exampleSec",
+    endpoint: "https://dest.example.com/mp/collect",
+  };
+
+  const info: Deno.ServeHandlerInfo = {
+    completed: ignoredRejectedPromise(),
+    remoteAddr: { hostname: "1.2.3.4", port: 12345, transport: "tcp" },
+  };
+
+  function createRequest(
+    { method = "POST", body }: { method?: string; body?: string } = {},
+  ): Request {
+    return new Request("https://example.com/mp/collect", {
+      method,
+      headers: { "content-type": "application/json" },
+      body: body ?? JSON.stringify(
+        {
+          ...{ client_id: "test", events: [] } satisfies AnyPayload,
+          ignored: true,
+        },
+      ),
+    });
+  }
+
+  await t.step("provides view of proxy options", () => {
+    assertEquals(forwarder.proxy, defaultProxyOptions);
+    assert(!Object.is(forwarder.proxy, defaultProxyOptions));
+  });
+
+  await t.step("forwards valid request", async () => {
+    const request = createRequest();
+
+    using fetchStub = stub(globalThis, "fetch", async (input, init) => {
+      const request = input instanceof Request
+        ? input
+        : new Request(input, init);
+      assertEquals(
+        request.url,
+        "https://dest.example.com/mp/collect?api_secret=exampleSec&measurement_id=exampleId",
+      );
+      assertEquals(await request.json(), { client_id: "test", events: [] });
+      return new Response(null, { status: StatusCodes.NO_CONTENT });
+    });
+
+    const response = await forwarder.forwardAndRespond({
+      request,
+      requestMeta,
+      info,
+    });
+
+    assertEquals(fetchStub.calls.length, 1);
+    assertEquals(response.status, StatusCodes.NO_CONTENT);
+  });
+
+  await t.step("responds with error from requestReader", async () => {
+    const request = createRequest({ method: "PUT" }); // incorrect method
+
+    const response = await forwarder.forwardAndRespond(
+      { request, requestMeta, info },
+    );
+    assertEquals(response.status, StatusCodes.METHOD_NOT_ALLOWED);
+  });
+
+  await t.step("responds with error from payloadParser", async () => {
+    const request = createRequest({ body: JSON.stringify({}) }); // invalid payload
+
+    const response = await forwarder.forwardAndRespond(
+      { request, requestMeta, info },
+    );
+    assertEquals(response.status, StatusCodes.BAD_REQUEST);
+  });
+
+  await t.step("responds with error from proxySender", async () => {
+    const request = createRequest();
+    using fetchStub = stub(globalThis, "fetch", () => {
+      throw new TypeError("network error");
+    });
+
+    const response = await forwarder.forwardAndRespond(
+      { request, requestMeta, info },
+    );
+    assertEquals(fetchStub.calls.length, 1);
+    assertEquals(response.status, StatusCodes.BAD_GATEWAY);
   });
 });

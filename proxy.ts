@@ -1,7 +1,6 @@
 import { Error, Result } from "./_misc.ts";
 import { z } from "./deps.ts";
 import { RequestMeta } from "./meta.ts";
-import { Responder } from "./requests.ts";
 
 export type RequestMatchError =
   | Error<"not-known-path">
@@ -28,11 +27,10 @@ export type RequestReadError =
   | Error<"body-not-valid-json">
   | Error<"request-io-error">;
 
-// export type RequestParseError = Error<"placeholder">; // FIXME
 export type PayloadParseError = Error<
   "invalid-ga4mp-payload",
   { zodError: z.ZodError }
->; // FIXME
+>;
 
 export type ProxySendErrorAborted = Error<"aborted", { message?: string }>;
 export type ProxySendErrorTimeout = Error<"timeout", { message?: string }>;
@@ -59,10 +57,7 @@ export type GA4MPPayload<T> = {
 };
 
 export type UnknownPayload = GA4MPPayload<unknown>;
-// export type ReadRequest<T, M> = {};
 
-// TODO: we can use the read result to hold custom request meta if needed, don't need separate meta type
-// TODO: should we pass matchinfo rather than requestmeta?
 export type RequestReader<
   RawPayloadT extends UnknownPayload, // = RawPayload,
   RequestReadErrorT, // = RequestReadError,
@@ -111,12 +106,7 @@ export type ResponseWriter<
   options: RequestMetaOptions<RequestMetaT>,
 ) => Response | Promise<Response>;
 
-// type HandlerOptions<RequestMatchErrorT = RequestMatchError> = {
-//   requestMatcher: RequestMatcher<RequestMatchErrorT>;
-//   fallbackHandler: FallbackHandler<RequestMatchErrorT>;
-// };
-
-type ProxyOptions<
+export type ProxyOptions<
   RawPayloadT extends UnknownPayload,
   PayloadT extends UnknownPayload,
   ProxyResultT,
@@ -146,107 +136,15 @@ type ProxyOptions<
   >;
 };
 
-export class GA4MPRequestForwardResponder<RequestMetaT extends RequestMeta>
-  implements Responder {
-  constructor(
-    public readonly request: Request,
-    public readonly info: Deno.ServeHandlerInfo,
-    public readonly requestMeta: RequestMetaT,
-    public readonly forwarder: RequestForwarder<RequestMetaT>,
-  ) {}
-
-  async respond(): Promise<Response> {
-    return await this.forwarder.forwardAndRespond(this);
-  }
-}
-
-type ForwardAndRespondOptions<RequestMetaT> = {
+export type ForwardAndRespondOptions<RequestMetaT> = {
   request: Request;
   requestMeta: RequestMetaT;
   info: Deno.ServeHandlerInfo;
 };
 
+/** Handle incoming GA4MP requests by */
 export interface RequestForwarder<RequestMetaT extends RequestMeta> {
   forwardAndRespond(
     options: ForwardAndRespondOptions<RequestMetaT>,
   ): Promise<Response>;
-}
-
-export class DefaultRequestForwarder<
-  RawPayloadT extends UnknownPayload,
-  PayloadT extends UnknownPayload,
-  ProxyResultT,
-  RequestMetaT extends RequestMeta,
-  RequestReadErrorT,
-  PayloadParseErrorT,
-  ProxySendErrorT,
-> implements RequestForwarder<RequestMetaT> {
-  #proxy: ProxyOptions<
-    RawPayloadT,
-    PayloadT,
-    ProxyResultT,
-    RequestMetaT,
-    RequestReadErrorT,
-    PayloadParseErrorT,
-    ProxySendErrorT
-  >;
-  constructor(
-    proxy: ProxyOptions<
-      RawPayloadT,
-      PayloadT,
-      ProxyResultT,
-      RequestMetaT,
-      RequestReadErrorT,
-      PayloadParseErrorT,
-      ProxySendErrorT
-    >,
-  ) {
-    this.#proxy = Object.freeze({ ...proxy });
-  }
-
-  get proxy(): Readonly<
-    ProxyOptions<
-      RawPayloadT,
-      PayloadT,
-      ProxyResultT,
-      RequestMetaT,
-      RequestReadErrorT,
-      PayloadParseErrorT,
-      ProxySendErrorT
-    >
-  > {
-    return this.#proxy;
-  }
-
-  async forwardAndRespond(
-    { request, requestMeta }: ForwardAndRespondOptions<RequestMetaT>,
-  ): Promise<Response> {
-    const readResult = await this.proxy.requestReader(request, {
-      requestMeta,
-    });
-    if (!readResult.success) {
-      return await this.proxy.responseWriter(readResult, { requestMeta });
-    }
-
-    const parseResult = await this.proxy.payloadParser(
-      readResult.data,
-      { requestMeta },
-    );
-    if (!parseResult.success) {
-      return await this.proxy.responseWriter(parseResult, { requestMeta });
-    }
-
-    const proxyResult = await this.proxy.proxySender(
-      parseResult.data,
-      { requestMeta, signal: request.signal },
-    );
-    if (!proxyResult.success) {
-      return await this.proxy.responseWriter(proxyResult, { requestMeta });
-    }
-
-    return await this.proxy.responseWriter({
-      success: true,
-      data: { payload: parseResult.data, proxyResult: proxyResult.data },
-    }, { requestMeta });
-  }
 }

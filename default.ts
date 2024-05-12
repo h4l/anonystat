@@ -7,13 +7,16 @@ import {
 import { StatusCodes, z } from "./deps.ts";
 import { AnyPayload } from "./payload-schemas.ts";
 import {
+  ForwardAndRespondOptions,
   PayloadParseError,
+  ProxyOptions,
   ProxySender,
   ProxySendError,
   ProxySendErrorAborted,
   ProxySendErrorIO,
   ProxySendErrorResponseStatus,
   ProxySendErrorTimeout,
+  RequestForwarder,
   ResponseWriter,
   UnknownPayload,
 } from "./proxy.ts";
@@ -375,10 +378,89 @@ export const defaultProxyOptions = {
   responseWriter: defaultResponseWriter,
 };
 
-export type GA4DataStream = {
-  api_secret: string;
-  measurement_id: string;
-};
+/** The core GA4 MP request handling logic that forwards events upstream and sends a response.
+ *
+ * This implementation handles requests in a customisable way by stringing
+ * together {@linkcode ProxyOptions} components, each of which can be changed.
+ */
+export class DefaultRequestForwarder<
+  RawPayloadT extends UnknownPayload,
+  PayloadT extends UnknownPayload,
+  ProxyResultT,
+  RequestMetaT extends RequestMeta,
+  RequestReadErrorT,
+  PayloadParseErrorT,
+  ProxySendErrorT,
+> implements RequestForwarder<RequestMetaT> {
+  #proxy: ProxyOptions<
+    RawPayloadT,
+    PayloadT,
+    ProxyResultT,
+    RequestMetaT,
+    RequestReadErrorT,
+    PayloadParseErrorT,
+    ProxySendErrorT
+  >;
+  constructor(
+    proxy: ProxyOptions<
+      RawPayloadT,
+      PayloadT,
+      ProxyResultT,
+      RequestMetaT,
+      RequestReadErrorT,
+      PayloadParseErrorT,
+      ProxySendErrorT
+    >,
+  ) {
+    this.#proxy = Object.freeze({ ...proxy });
+  }
+
+  get proxy(): Readonly<
+    ProxyOptions<
+      RawPayloadT,
+      PayloadT,
+      ProxyResultT,
+      RequestMetaT,
+      RequestReadErrorT,
+      PayloadParseErrorT,
+      ProxySendErrorT
+    >
+  > {
+    return this.#proxy;
+  }
+
+  async forwardAndRespond(
+    { request, requestMeta }: ForwardAndRespondOptions<RequestMetaT>,
+  ): Promise<Response> {
+    const readResult = await this.proxy.requestReader(request, {
+      requestMeta,
+    });
+    if (!readResult.success) {
+      return await this.proxy.responseWriter(readResult, { requestMeta });
+    }
+
+    const parseResult = await this.proxy.payloadParser(
+      readResult.data,
+      { requestMeta },
+    );
+    if (!parseResult.success) {
+      return await this.proxy.responseWriter(parseResult, { requestMeta });
+    }
+
+    const proxyResult = await this.proxy.proxySender(
+      parseResult.data,
+      { requestMeta, signal: request.signal },
+    );
+    if (!proxyResult.success) {
+      return await this.proxy.responseWriter(proxyResult, { requestMeta });
+    }
+
+    return await this.proxy.responseWriter({
+      success: true,
+      data: { payload: parseResult.data, proxyResult: proxyResult.data },
+    }, { requestMeta });
+  }
+}
 
 const ContentType = z.string().transform((
   contentType: string,
