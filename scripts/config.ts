@@ -190,11 +190,11 @@ applied.
 ${JSON.stringify(config, undefined, 2)}
 \`\`\`
 
-## Individual environment variables
+## Individual environment variables (\`--format env\`)
 
 ${envVarsMd}
 
-## Single environment variable containing JSON config
+## Single environment variable containing JSON config (\`--format env-json\`)
 
 \`\`\`console
 ${
@@ -208,7 +208,7 @@ ${
   }
 \`\`\`
 
-## JSON config
+## JSON config (\`--format json\`)
 
 The loaded config with defaults removed and unnecessary arrays removed.
 
