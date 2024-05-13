@@ -9,7 +9,7 @@ import {
 } from "../config.ts";
 import { ConfigEnvars } from "../config.ts";
 import { z } from "../deps.ts";
-import { marked, markedTerminal, parseArgs } from "./script_deps.ts";
+import { parseArgs } from "./script_deps.ts";
 
 const usage = `Usage: deno run config_cli.ts [-hc] [-f <format>] [<file>]`;
 const help = `\
@@ -91,8 +91,7 @@ async function main() {
 
   switch (args.format) {
     case "terminal": {
-      marked.use(markedTerminal({}));
-      console.log(marked.parse(formatMarkdown(config)));
+      console.log(formatMarkdown(config));
       break;
     }
     case "markdown": {
