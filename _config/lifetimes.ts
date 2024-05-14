@@ -14,6 +14,20 @@ const UtcDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
 
 const UtcDateTime = z.string().datetime().pipe(z.coerce.date());
 
+const UtcDateOrDateTime = z.string().transform((arg, ctx) => {
+  // Manually union UtcDateTime and UtcDate because getting good error messages
+  // out of z.union is somewhere between too much effort and impossible.
+  for (const fmt of [UtcDate, UtcDateTime]) {
+    const result = fmt.safeParse(arg);
+    if (result.success) return result.data;
+  }
+  ctx.addIssue({
+    code: "invalid_date",
+    message: "Not a YYYY-MM-DD date or a YYYY-MM-DDTHH:MM:SSZ date",
+  });
+  return z.NEVER;
+});
+
 const possibleTimeUnitMessage = Object.values(TimeUnit.Enum).join(", ");
 
 function parseLaxTimeUnit(value: string): TimeUnit | undefined {
@@ -40,7 +54,7 @@ export const DEFAULT_LIFETIME_COUNT = 1;
 export const LifetimeObject = z.object({
   count: z.number().int().nonnegative().default(DEFAULT_LIFETIME_COUNT),
   unit: LaxTimeUnit,
-  from: z.union([UtcDate, UtcDateTime]).optional(),
+  from: UtcDateOrDateTime.optional(),
 });
 
 type ParsedLifetimeExpression = {
