@@ -1,0 +1,175 @@
+export const snapshot = {};
+
+snapshot[`--help shows help 1`] = `
+"out|Validate and print anonystat config.
+out|
+out|Usage: deno run config.ts [-hc] [-f <format>] [<file>]
+out|
+out|Configuration is read from environment variables unless <file> is provided, in
+out|which case environment variables are ignored.
+out|
+out|Arguments:
+out|  <file>:  Path of a json[c] config file.
+out|
+out|Options:
+out|  -f, --format: The representation to print after validating. <format> is:
+out|                'env', 'env-json', 'env-vars', 'json', 'markdown'.
+out|                                                                [Default: 'env']
+out|  -c, --compact: Don't indent JSON output
+out|  -h, --help:    Show this help
+out|"
+`;
+
+snapshot[`loads config from environment 1`] = `
+"out|ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=a
+out|ANONYSTAT_DATA_STREAM_IN_API_SECRET=b
+out|ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=c
+out|ANONYSTAT_DATA_STREAM_OUT_API_SECRET=d"
+`;
+
+snapshot[`loads config from argument file 1`] = `
+"out|ANONYSTAT_DATA_STREAM_MEASUREMENT_ID=G-ABCDE12345
+out|ANONYSTAT_DATA_STREAM_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab"
+`;
+
+snapshot[`--format env-vars cannot represent configs with multiple forwarding rules 1`] = `"err|Cannot represent config with individual envars: Config contains multiple forward rules"`;
+
+snapshot[`--format env-vars represents configs with one forwarding rule as individual vars 1`] = `
+"out|ANONYSTAT_CONFIG_SOURCE=env
+out|ANONYSTAT_USER_ID_LIFETIME=R/2024-02-14/P2M
+out|ANONYSTAT_USER_ID_EXISTING=replace
+out|ANONYSTAT_USER_ID_SCRAMBLING_SECRET=0000000
+out|ANONYSTAT_ALLOW_DEBUG=true
+out|ANONYSTAT_DESTINATION=https://example.com/mp/collect
+out|ANONYSTAT_LISTEN_HOSTNAME=1.2.3.4
+out|ANONYSTAT_LISTEN_PORT=9000
+out|ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=foo
+out|ANONYSTAT_DATA_STREAM_IN_API_SECRET=secret123
+out|ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=G-ABCDE12345
+out|ANONYSTAT_DATA_STREAM_OUT_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab"
+`;
+
+snapshot[`--format env represents configs with one forwarding rule as individual vars 1`] = `
+"out|ANONYSTAT_USER_ID_LIFETIME=R/2024-02-14/P2M
+out|ANONYSTAT_USER_ID_EXISTING=replace
+out|ANONYSTAT_USER_ID_SCRAMBLING_SECRET=0000000
+out|ANONYSTAT_ALLOW_DEBUG=true
+out|ANONYSTAT_DESTINATION=https://example.com/mp/collect
+out|ANONYSTAT_LISTEN_HOSTNAME=1.2.3.4
+out|ANONYSTAT_LISTEN_PORT=9000
+out|ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=foo
+out|ANONYSTAT_DATA_STREAM_IN_API_SECRET=secret123
+out|ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=G-ABCDE12345
+out|ANONYSTAT_DATA_STREAM_OUT_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab"
+`;
+
+snapshot[`--format env represents configs with multiple forwarding rule as JSON var 1`] = `
+'out|ANONYSTAT_CONFIG_SOURCE=json
+out|ANONYSTAT_CONFIG={"forward":[{"data_stream":[{"in":{"measurement_id":"mid1","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout1","api_secret":"defaultsecret888"}},{"in":{"measurement_id":"mid2","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout2","api_secret":"defaultsecret888"}}],"user_id":{"lifetime":"2 weeks","scrambling_secret":"foobarbaz4"},"allow_debug":true,"destination":"https://lol/foo/123"},{"data_stream":{"in":{"measurement_id":"mid3","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout1","api_secret":"defaultsecret888"}},"destination":"https://example.com/foo/123"}],"listen":{"hostname":"1.2.3.4","port":9000}}'
+`;
+
+snapshot[`--format env-json represents configs with one forwarding rule as JSON var 1`] = `
+'out|ANONYSTAT_CONFIG_SOURCE=json
+out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"measurement_id":"foo","api_secret":"secret123"},"out":{"measurement_id":"G-ABCDE12345","api_secret":"Ab12Ab12Ab12Ab12Ab12Ab"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect"},"listen":{"hostname":"1.2.3.4","port":9000}}'
+`;
+
+snapshot[`--format json prints indented JSON 1`] = `
+'out|{
+out|  "forward": {
+out|    "data_stream": {
+out|      "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab",
+out|      "measurement_id": "G-ABCDE12345"
+out|    }
+out|  }
+out|}'
+`;
+
+snapshot[`--format json with --compact prints compact JSON 1`] = `'out|{"forward":{"data_stream":{"api_secret":"Ab12Ab12Ab12Ab12Ab12Ab","measurement_id":"G-ABCDE12345"}}}'`;
+
+snapshot[`--format markdown prints a markdown doc with every config format 1`] = `
+'out|# Anonystat Config Information
+out|
+out|This is your currently-active configuration, validated and presented in
+out|different ways.
+out|
+out|## Loaded config
+out|
+out|The config loaded from provided environment variables, normalised with defaults
+out|applied.
+out|
+out|\`\`\`json
+out|{
+out|  "forward": [
+out|    {
+out|      "data_stream": [
+out|        {
+out|          "in": {
+out|            "measurement_id": "G-ABCDE12345",
+out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+out|          },
+out|          "out": {
+out|            "measurement_id": "G-ABCDE12345",
+out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+out|          }
+out|        }
+out|      ],
+out|      "destination": "https://www.google-analytics.com/mp/collect",
+out|      "allow_debug": false,
+out|      "user_id": {
+out|        "scrambling_secret": null,
+out|        "lifetime": {
+out|          "count": 1,
+out|          "unit": "months"
+out|        },
+out|        "existing": "scramble"
+out|      }
+out|    }
+out|  ],
+out|  "listen": {
+out|    "port": 8000,
+out|    "hostname": "127.0.0.1"
+out|  }
+out|}
+out|\`\`\`
+out|
+out|## Individual environment variables (\`--format env\`)
+out|
+out|\`\`\`console
+out|ANONYSTAT_CONFIG_SOURCE=env
+out|ANONYSTAT_DATA_STREAM_MEASUREMENT_ID=G-ABCDE12345
+out|ANONYSTAT_DATA_STREAM_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab
+out|\`\`\`
+out|
+out|
+out|## Single environment variable containing JSON config (\`--format env-json\`)
+out|
+out|\`\`\`console
+out|ANONYSTAT_CONFIG_SOURCE=json
+out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"api_secret":"Ab12Ab12Ab12Ab12Ab12Ab","measurement_id":"G-ABCDE12345"}}}
+out|\`\`\`
+out|
+out|## JSON config (\`--format json\`)
+out|
+out|The loaded config with defaults removed and unnecessary arrays removed.
+out|
+out|\`\`\`json
+out|{
+out|  "forward": {
+out|    "data_stream": {
+out|      "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab",
+out|      "measurement_id": "G-ABCDE12345"
+out|    }
+out|  }
+out|}
+out|\`\`\`
+out|
+out|To load configuration from a file containing the above JSON content, set these
+out|environment variables:
+out|
+out|\`\`\`console
+out|ANONYSTAT_CONFIG_SOURCE=file
+out|ANONYSTAT_CONFIG_FILE=/example/path/config.json
+out|\`\`\`
+out|
+out|'
+`;

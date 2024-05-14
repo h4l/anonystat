@@ -1,0 +1,29 @@
+{
+  "forward": {
+    "data_stream": {
+      "in": {
+        "measurement_id": "foo",
+        "api_secret": "secret123"
+      },
+      "out": {
+        "measurement_id": "G-ABCDE12345",
+        "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+      }
+    },
+    "user_id": {
+      "lifetime": {
+        "count": 2,
+        "unit": "months",
+        "from": "2024-02-14T00:00:00Z"
+      },
+      "scrambling_secret": "0000000",
+      "existing": "replace"
+    },
+    "destination": "https://example.com/mp/collect",
+    "allow_debug": true
+  },
+  "listen": {
+    "port": 9000,
+    "hostname": "1.2.3.4"
+  }
+}

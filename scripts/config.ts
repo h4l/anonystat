@@ -11,29 +11,34 @@ import { ConfigEnvars } from "../config.ts";
 import { z } from "../deps.ts";
 import { parseArgs } from "./script_deps.ts";
 
-const usage = `Usage: deno run config_cli.ts [-hc] [-f <format>] [<file>]`;
+const usage = `Usage: deno run config.ts [-hc] [-f <format>] [<file>]`;
 const help = `\
 Validate and print anonystat config.
 
 ${usage}
 
+Configuration is read from environment variables unless <file> is provided, in
+which case environment variables are ignored.
+
+Arguments:
+  <file>:  Path of a json[c] config file.
+
 Options:
-  -f, --format: Output just this representation. <format> is: 'terminal',
-                'markdown', 'json', 'env', 'env-json', 'env-vars'.
-                                                           [Default: 'terminal']
-  -c, --compact: Don't indent JSON
+  -f, --format: The representation to print after validating. <format> is:
+                'env', 'env-json', 'env-vars', 'json', 'markdown'.
+                                                                [Default: 'env']
+  -c, --compact: Don't indent JSON output
   -h, --help:    Show this help
 `;
 
 const Arguments = z.object({
   format: z.enum([
-    "terminal",
     "markdown",
     "json",
     "env",
     "env-json",
     "env-vars",
-  ]).default("terminal"),
+  ]).default("env"),
   compact: z.boolean(),
   help: z.boolean(),
   file: z.array(z.any()).max(1, {
@@ -66,8 +71,8 @@ async function loadConfigOrExit({ exitStatus }: { exitStatus?: number } = {}) {
   }
 }
 
-async function main() {
-  const parse = parseArguments(Deno.args);
+export async function main(rawArgs: string[] = Deno.args) {
+  const parse = parseArguments(rawArgs);
   if (!parse.success) {
     console.error(
       "Incorrect command-line arguments:",
@@ -90,10 +95,6 @@ async function main() {
   const config = await loadConfigOrExit({ exitStatus: 1 });
 
   switch (args.format) {
-    case "terminal": {
-      console.log(formatMarkdown(config));
-      break;
-    }
     case "markdown": {
       console.log(formatMarkdown(config));
       break;
@@ -108,27 +109,12 @@ async function main() {
       if (envars.success) {
         console.log(formatDotEnvFile(envars.data));
       } else {
-        console.log(
-          formatDotEnvFile({
-            [ConfigEnvars.config]: formatJson(config, {
-              simplify: true,
-              compact: args.compact,
-            }),
-          }),
-        );
+        console.log(formatEnvJson(config));
       }
       break;
     }
     case "env-json": {
-      console.log(
-        formatDotEnvFile({
-          [ConfigEnvars.config_source]: ConfigSource.Enum.json,
-          [ConfigEnvars.config]: formatJson(config, {
-            compact: true,
-            simplify: true,
-          }),
-        }),
-      );
+      console.log(formatEnvJson(config));
       break;
     }
     case "env-vars": {
@@ -145,6 +131,16 @@ ${format.data}`);
     default:
       assertUnreachable(args.format);
   }
+}
+
+function formatEnvJson(config: Config): string {
+  return formatDotEnvFile({
+    [ConfigEnvars.config_source]: ConfigSource.Enum.json,
+    [ConfigEnvars.config]: formatJson(config, {
+      compact: true,
+      simplify: true,
+    }),
+  });
 }
 
 function formatJson(

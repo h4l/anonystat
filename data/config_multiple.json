@@ -1,0 +1,53 @@
+{
+    "forward": [
+        {
+            "data_stream": [
+                {
+                    "in": {
+                        "measurement_id": "mid1",
+                        "api_secret": "defaultsecret999"
+                    },
+                    "out": {
+                        "measurement_id": "midout1",
+                        "api_secret": "defaultsecret888"
+                    }
+                },
+                {
+                    "in": {
+                        "measurement_id": "mid2",
+                        "api_secret": "defaultsecret999"
+                    },
+                    "out": {
+                        "measurement_id": "midout2",
+                        "api_secret": "defaultsecret888"
+                    }
+                }
+            ],
+            "destination": "https://lol/foo/123",
+            "allow_debug": true,
+            "user_id": {
+                "scrambling_secret": "foobarbaz4",
+                "lifetime": "2 weeks",
+                "existing": "scramble"
+            }
+        },
+        {
+            "data_stream": {
+                "in": {
+                    "measurement_id": "mid3",
+                    "api_secret": "defaultsecret999"
+                },
+                "out": {
+                    "measurement_id": "midout1",
+                    "api_secret": "defaultsecret888"
+                }
+            },
+            "destination": "https://example.com/foo/123",
+            "allow_debug": false
+        }
+    ],
+    "listen": {
+        "port": 9000,
+        "hostname": "1.2.3.4"
+    }
+}

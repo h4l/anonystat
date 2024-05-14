@@ -7,6 +7,7 @@ export {
   AssertionError,
   assertLess,
   assertLessOrEqual,
+  assertMatch,
   assertNotEquals,
   assertRejects,
   assertStringIncludes,
@@ -28,3 +29,5 @@ import { validate } from "https://deno.land/std@0.221.0/uuid/mod.ts";
 export const validateUuid = validate;
 
 export { toText } from "https://deno.land/std@0.221.0/streams/mod.ts";
+
+export { fromFileUrl } from "https://deno.land/std@0.221.0/path/posix/from_file_url.ts";

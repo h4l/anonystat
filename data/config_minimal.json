@@ -1,0 +1,8 @@
+{
+  "forward": {
+    "data_stream": {
+      "measurement_id": "G-ABCDE12345",
+      "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+    }
+  }
+}
