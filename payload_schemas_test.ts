@@ -1,5 +1,5 @@
 import { AnyEvent, ParameterValue, UserProperties } from "./payload_schemas.ts";
-import { repeat, repeatString, SchemaAssertions } from "./test-utils.ts";
+import { repeat, repeatString, SchemaAssertions } from "./_testing/schemas.ts";
 import { ParameterName } from "./payload_schemas.ts";
 import { EventName } from "./payload_schemas.ts";
 import { AnyItem, AnyPayload } from "./payload_schemas.ts";

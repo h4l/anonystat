@@ -1,6 +1,6 @@
-import { assert, assertEquals } from "./dev_deps.ts";
+import { assert, assertEquals } from "../dev_deps.ts";
 
-import { z } from "./deps.ts";
+import { z } from "../deps.ts";
 
 export function repeat<T>(value: T, times: number): T[] {
   const values = new Array(times);
