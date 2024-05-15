@@ -2,7 +2,6 @@ import { ErrorResult } from "./_misc.ts";
 import {
   assertSuccessful,
   assertUnsuccessful,
-  assertUuid,
   ignoredRejectedPromise,
 } from "./_testing.ts";
 import {
@@ -268,7 +267,7 @@ Deno.test("defaultResponseWriter()", async (t) => {
   });
 });
 
-Deno.test("approvedRequestDestinationSelector()", async () => {
+Deno.test("approvedRequestDestinationSelector()", () => {
   const payload: UnknownPayload = { payload: {} };
   const endpoint = "https://dest.example.com/mp/collect";
   const measurement_id = "exampleId";
@@ -395,8 +394,9 @@ async function testProxySender<
   await t.step(
     "returns result from resultCreator when fetch succeeds",
     async () => {
-      using fetchStub = stub(globalThis, "fetch", async () => {
-        return new Response(null, { status: StatusCodes.NO_CONTENT });
+      using fetchStub = stub(globalThis, "fetch", () => {
+        const resp = new Response(null, { status: StatusCodes.NO_CONTENT });
+        return Promise.resolve(resp);
       });
       const result = await proxySender(validPayload, { requestMeta });
       assertSuccessful(result);
@@ -445,7 +445,7 @@ async function testProxySender<
   await t.step(
     "returns proxy-io-error error when fetch fails",
     async () => {
-      using fetchStub = stub(globalThis, "fetch", async () => {
+      using fetchStub = stub(globalThis, "fetch", () => {
         // fetch() is specc'd to throw TypeError for network errors:
         // See 5.6 / 12 / 3 in https://fetch.spec.whatwg.org/#fetch-method
         throw new TypeError("network error");
@@ -463,10 +463,9 @@ async function testProxySender<
   await t.step(
     "returns proxy-response-status error when fetch response is not ok",
     async () => {
-      using fetchStub = stub(globalThis, "fetch", async () => {
-        return new Response(null, {
-          status: StatusCodes.IM_A_TEAPOT,
-        });
+      using fetchStub = stub(globalThis, "fetch", () => {
+        const resp = new Response(null, { status: StatusCodes.IM_A_TEAPOT });
+        return Promise.resolve(resp);
       });
 
       const result = await proxySender(validPayload, { requestMeta });

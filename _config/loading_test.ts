@@ -16,7 +16,6 @@ import {
   assertInstanceOf,
   assertNotEquals,
   assertStringIncludes,
-  stub,
 } from "../dev_deps.ts";
 import { JsonValue } from "../deps.ts";
 import { TemporaryFile } from "../_testing/tempfile.ts";
@@ -94,7 +93,7 @@ Deno.test("loadConfig()", async (t) => {
   });
 
   await t.step("from envars", async (t) => {
-    await t.step("minimal required envars", async (t) => {
+    await t.step("minimal required envars", async () => {
       const configLoad = await loadConfig({
         env: envMap({
           ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "abc123",

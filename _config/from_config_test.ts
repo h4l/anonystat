@@ -1,5 +1,4 @@
 import {
-  assertFetchForMpCollectRequest,
   assertOneFetchForMpCollectRequest,
   assertResponseOk,
   assertSuccessful,
@@ -19,14 +18,10 @@ import { StatusCodes } from "../deps.ts";
 Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
   const kv = await Deno.openKv(":memory:");
 
-  // disable fetch to prevent unintentional calls
-  // stub(globalThis, "fetch", async () => {
-  //   throw new Error("unexpected fetch() call");
-  // });
-
   function stubFetch() {
-    return stub(globalThis, "fetch", async (_url, _request) => {
-      return new Response(undefined, { status: StatusCodes.NO_CONTENT });
+    return stub(globalThis, "fetch", () => {
+      const resp = new Response(undefined, { status: StatusCodes.NO_CONTENT });
+      return Promise.resolve(resp);
     });
   }
 

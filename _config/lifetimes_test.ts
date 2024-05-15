@@ -3,7 +3,6 @@ import { z } from "../deps.ts";
 import { assert, assertEquals, assertSnapshot } from "../dev_deps.ts";
 
 import {
-  EvaluatedDisambiguatedLifetimeExpression,
   formatCompactIsoDateTime,
   formatIsoInterval,
   ParsedIsoIntervalLifetime,

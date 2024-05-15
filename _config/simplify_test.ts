@@ -1,6 +1,6 @@
 import { date } from "../_testing.ts";
 import { GA4MP_URL } from "../constants.ts";
-import { assertEquals, assertSnapshot } from "../dev_deps.ts";
+import { assertEquals } from "../dev_deps.ts";
 import {
   Config,
   DEFAULT_EXISTING_POLICY,
@@ -11,7 +11,7 @@ import {
 import { simplifyConfig } from "./simplify.ts";
 
 Deno.test("simplifyConfig()", async (t) => {
-  await t.step("maintains non-defaults", async (t) => {
+  await t.step("maintains non-defaults", async () => {
     const config: Config = {
       forward: [{
         data_stream: [{

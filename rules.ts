@@ -16,7 +16,6 @@ import { Responder } from "./requests.ts";
 import { HandlerRequest } from "./requests.ts";
 import { Matcher } from "./requests.ts";
 import { matchDefaultGA4MPUrls } from "./default.ts";
-import { assert } from "./dev_deps.ts";
 import { ErrorResult } from "./_misc.ts";
 import { maxWith } from "./deps.ts";
 
