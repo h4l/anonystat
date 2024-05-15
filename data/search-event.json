@@ -1,0 +1,21 @@
+{
+    "client_id": "client123",
+    "user_id": "user12",
+    "non_personalized_ads": true,
+    "user_properties": {
+        "foo": {
+            "value": "bar"
+        },
+        "abc": {
+            "value": 42
+        }
+    },
+    "events": [
+        {
+            "name": "search",
+            "params": {
+                "search_term": "potatoes"
+            }
+        }
+    ]
+}
