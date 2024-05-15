@@ -126,6 +126,111 @@ HTTP/2 204
 [tutorial on using Google Analytics 4 in a Chrome
     Extension]: https://developer.chrome.com/docs/extensions/how-to/integrate/google-analytics-4
 
+## Configuration
+
+Anonystat is configured using environment variables. It also has a JSON config
+format. See the [`data/config_*`](./data/) files for some examples.
+
+```jsonc
+{
+  // Configs define one or more Google Analytics Data Stream that Anonystat will
+  // forward events to. Each Data Stream is identified by a measurement_id, and
+  // corresponding api_secret.
+  //
+  // "forward" and "data_stream" can be repeated multiple times by using an
+  // array of objects — see data/config_multiple.json for an example.
+  "forward": {
+    "data_stream": {
+      // The "in" values are used in the URL when sending events to Anonystat,
+      // e.g. https://.../mp/collect?api_secret=xxx&measurement_id=yyy
+      "in": {
+        "measurement_id": "foo",
+        "api_secret": "secret123"
+      },
+      // The "out" values are used by Anonystat when forwarding events to Google
+      // Analytics for the corresponding "in" credentials
+      "out": {
+        "measurement_id": "G-ABCDE12345",
+        "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+      }
+    },
+    // "user_id" controls how user_id values are generated/anonymised when
+    // Anonystat forwards events.
+    "user_id": {
+      // "lifetime" controls the repeating periods in which user_id values will
+      // be stable. After each lifetime, Anonystat generates and stores a new
+      // secret, and as a result generates/scrambled user_ids are different in
+      // each lifetime period.
+      "lifetime": {
+        "count": 2,
+        // Possible values are "hours", "days", "weeks", "months", "quarters",
+        // "years"
+        "unit": "months",
+        // The reference point to start the period. Default is 1970-01-01 00:00
+        "from": "2024-02-14T00:00:00Z"
+      },
+      // "scrambling_secret" is combined with the lifetime secret when hashing
+      // values to generate/scramble user_id values. It's not essential, as the
+      // randomly-generated lifetime secret makes user_ids unpredictable, but
+      // this can be used to force user_id values to change, or just for good
+      // measure.
+      "scrambling_secret": "0000000",
+      // How to treat existing user_id values in incoming event payloads.
+      // Possible values are "replace", "keep" or "scramble".
+      // - "replace" will overwrite an existing user_id value with a generated
+      //   value, as if user_id was not provided.
+      // - "scramble" (the default) will hash the provided user_id with the
+      //   available secrets to create a deterministic, but unpredictable value.
+      // - "keep" will leave the provided user_id as-is in the forwarded event
+      //   payload.
+      "existing": "keep"
+    },
+    // The URL Anonystat will forward events to.
+    // Default is "https://www.google-analytics.com/mp/collect"
+    "destination": "https://example.com/mp/collect",
+    // If true, events can be sent to the /debug/mp/collect path, in addition to
+    // the regular /mp/collect path for the the above measurement_id(s).
+    // The debug path shows validation error details for invalid event payloads.
+    "allow_debug": true
+  },
+  // Control the TCP socket Anonystat opens to listen for HTTP requests. This is
+  // not needed when deploying to Deno Deploy.
+  "listen": {
+    // Default is 8000
+    "port": 9000,
+    // Default is localhost/loopback (use 0.0.0.0 to listen on all interfaces)
+    "hostname": "1.2.3.4"
+  }
+}
+```
+
+Anonystat provides a config tool to validate and print environment variables for
+a JSON config file.
+
+```console
+$ deno task config data/config_single.json
+ANONYSTAT_USER_ID_LIFETIME=R/2024-02-14/P2M
+ANONYSTAT_USER_ID_EXISTING=replace
+ANONYSTAT_USER_ID_SCRAMBLING_SECRET=0000000
+ANONYSTAT_ALLOW_DEBUG=true
+ANONYSTAT_DESTINATION=https://example.com/mp/collect
+ANONYSTAT_LISTEN_HOSTNAME=1.2.3.4
+ANONYSTAT_LISTEN_PORT=9000
+ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=foo
+ANONYSTAT_DATA_STREAM_IN_API_SECRET=secret123
+ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=G-ABCDE12345
+ANONYSTAT_DATA_STREAM_OUT_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab
+```
+
+Use `--format env-json` to get a single environment variable, which is easier to
+copy & paste for Deno Deploy:
+
+```console
+$ deno task config data/config_single.json --format env-json
+ANONYSTAT_CONFIG_SOURCE=json
+ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"measurement_id":"foo","api_secret":"secret123"},"out":{"measurement_id":"G-ABCDE12345","api_secret":"Ab12Ab12Ab12Ab12Ab12Ab"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect"},"listen":{"hostname":"1.2.3.4","port":9000}}
+```
+
 ## Background
 
 I created Anonystat because I maintain some browser extensions, and wanted a
