@@ -1,6 +1,7 @@
 {
   "version": "0.1.0",
   "tasks": {
+    "all": "deno task check && deno task lint && deno task fmt && deno task test",
     "check": "deno check *.ts */*.ts",
     "lint": "deno lint *.ts */*.ts",
     "fmt": "deno fmt --check *.ts */*.ts",
