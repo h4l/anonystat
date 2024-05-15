@@ -1,0 +1,27 @@
+{
+  "version": "0.1.0",
+  "tasks": {
+    "check": "deno check *.ts */*.ts",
+    "lint": "deno lint *.ts */*.ts",
+    "fmt": "deno fmt --check *.ts */*.ts",
+    "config": "deno run --allow-read=. --allow-env scripts/config.ts",
+    "test": "deno --unstable-kv test --allow-net --allow-read=.,/tmp --allow-write=/tmp",
+    "test-snapshot-update": "deno --unstable-kv test --allow-net --allow-read=.,/tmp --allow-write=.,/tmp",
+    "test-cov": "deno --unstable-kv test --coverage=cov_profile --allow-read=.,/tmp --allow-write=/tmp",
+    "clean-cov": "rm -rf html_cov cov.lcov cov_profile",
+    "cov-html": "deno coverage --lcov --output=cov.lcov cov_profile/ && genhtml -o html_cov cov.lcov",
+    "serve-cov": "deno run --allow-net --allow-read --allow-sys https://deno.land/std/http/file_server.ts html_cov",
+    "cov": "deno task clean-cov && deno task test-cov && deno task cov-html && deno task serve-cov"
+  },
+  "deploy": {
+    "exclude": [
+      "**/node_modules",
+      "**/*_test.ts",
+      "scripts/*"
+    ],
+    "include": [
+      "**/*.ts"
+    ],
+    "entrypoint": "main.ts"
+  }
+}
