@@ -23,7 +23,7 @@ export const DataStreamInOut = z.object({
   in: DataStreamCredentials,
   out: DataStreamCredentials,
 });
-type DataStreamInOut = z.infer<typeof DataStreamInOut>;
+export type DataStreamInOut = z.infer<typeof DataStreamInOut>;
 
 export const DataStreamInOutShorthand = DataStreamCredentials.transform((
   ds,
@@ -46,7 +46,7 @@ export const ForwarderConfig = z.object({
   allow_debug: z.boolean().default(false),
   user_id: UserIdConfig.default({}),
 });
-type ForwarderConfig = z.infer<typeof ForwarderConfig>;
+export type ForwarderConfig = z.infer<typeof ForwarderConfig>;
 
 export const DEFAULT_PORT = 8000;
 export const DEFAULT_HOSTNAME = "127.0.0.1";

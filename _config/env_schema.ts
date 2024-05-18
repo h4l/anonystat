@@ -1,6 +1,6 @@
 import { ExistingIdPolicy } from "../anonymisation.ts";
 import { DestinationUrl, Host, Port, ScramblerKey } from "./values_schema.ts";
-import { ValidatedDisambiguatedLifetimeExpression } from "./lifetimes.ts";
+import { EvaluatedDisambiguatedLifetimeExpression } from "./lifetimes.ts";
 import { z } from "../deps.ts";
 
 function isTrue(value: string): boolean {
@@ -26,7 +26,7 @@ export enum ConfigEnvars {
   config_file = "ANONYSTAT_CONFIG_FILE",
 }
 
-const _ConfigEnv = z.object({
+export const RawConfigEnv = z.object({
   ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: EmptyStringAsUndefined.optional(),
   ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: EmptyStringAsUndefined.optional(),
   ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: EmptyStringAsUndefined.optional(),
@@ -39,7 +39,7 @@ const _ConfigEnv = z.object({
     ScramblerKey,
   ).optional(),
   ANONYSTAT_USER_ID_LIFETIME: EmptyStringAsUndefined.pipe(
-    ValidatedDisambiguatedLifetimeExpression,
+    EvaluatedDisambiguatedLifetimeExpression,
   ).optional(),
   ANONYSTAT_USER_ID_EXISTING: EmptyStringAsUndefined.pipe(ExistingIdPolicy)
     .optional(),
@@ -48,12 +48,12 @@ const _ConfigEnv = z.object({
   ).optional(),
   ANONYSTAT_LISTEN_HOSTNAME: EmptyStringAsUndefined.pipe(Host).optional(),
 });
-export type ConfigValueEnvarName = keyof typeof _ConfigEnv.shape;
+export type ConfigValueEnvarName = keyof typeof RawConfigEnv.shape;
 export const configValueEnvarNames = Object.keys(
-  _ConfigEnv.shape,
+  RawConfigEnv.shape,
 ) as readonly ConfigValueEnvarName[];
 
-export const ConfigEnv = _ConfigEnv.superRefine((val, ctx) => {
+export const ConfigEnv = RawConfigEnv.superRefine((val, ctx) => {
   const ensurePresent = (name: keyof typeof val, other: keyof typeof val) => {
     if (val[other] !== undefined || val[name] !== undefined) return;
     ctx.addIssue({
@@ -82,4 +82,4 @@ export const ConfigEnv = _ConfigEnv.superRefine((val, ctx) => {
   );
 });
 export type ConfigEnv = z.infer<typeof ConfigEnv>;
-export type RawConfigEnv = z.input<typeof ConfigEnv>;
+export type RawConfigEnv = z.infer<typeof RawConfigEnv>;

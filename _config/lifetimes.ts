@@ -56,6 +56,7 @@ export const LifetimeObject = z.object({
   unit: LaxTimeUnit,
   from: UtcDateOrDateTime.optional(),
 });
+export type LifetimeObject = z.infer<typeof LifetimeObject>;
 
 type ParsedLifetimeExpression = {
   expr: string;

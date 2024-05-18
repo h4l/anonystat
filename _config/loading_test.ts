@@ -1,5 +1,9 @@
 import { Config, ConfigInput } from "./json_schema.ts";
-import { ConfigEnvars, RawConfigEnv } from "./env_schema.ts";
+import {
+  ConfigEnvars,
+  ConfigValueEnvarName,
+  RawConfigEnv,
+} from "./env_schema.ts";
 import {
   ConfigLoadFailed,
   ConfigSource,
@@ -106,7 +110,7 @@ Deno.test("loadConfig()", async (t) => {
 
     await t.step("all envars", async () => {
       const configLoad = await loadConfig({
-        env: envMap<Required<RawConfigEnv>>({
+        env: envMap<Record<ConfigValueEnvarName, string>>({
           ANONYSTAT_ALLOW_DEBUG: "true",
           ANONYSTAT_DATA_STREAM_IN_API_SECRET: "secretIn",
           ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "secretOut",

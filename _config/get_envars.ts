@@ -1,7 +1,7 @@
 import { type Error, type Result } from "../_misc.ts";
 import { Config } from "./json_schema.ts";
 import { simplifyConfig } from "./simplify.ts";
-import { ConfigEnv } from "./env_schema.ts";
+import { ConfigValueEnvarName } from "./env_schema.ts";
 import { formatIsoInterval } from "./lifetimes.ts";
 
 export type GetEnvarsError =
@@ -9,7 +9,9 @@ export type GetEnvarsError =
   | Error<"multiple-data-stream">;
 
 /** Get the environment variable representation of a config, if possible. */
-export function getEnvars(config: Config): Result<ConfigEnv, GetEnvarsError> {
+export function getEnvars(
+  config: Config,
+): Result<Partial<Record<ConfigValueEnvarName, string>>, GetEnvarsError> {
   const simplified = simplifyConfig(config);
   if (Array.isArray(simplified.forward)) {
     return { success: false, error: { name: "multiple-forward" } };
@@ -26,15 +28,15 @@ export function getEnvars(config: Config): Result<ConfigEnv, GetEnvarsError> {
     ? formatIsoInterval(config.forward[0].user_id.lifetime)
     : forward.user_id?.lifetime;
 
-  const env: ConfigEnv = {
+  const env: Partial<Record<ConfigValueEnvarName, string>> = {
     ANONYSTAT_USER_ID_LIFETIME: lifetime,
     ANONYSTAT_USER_ID_EXISTING: forward.user_id?.existing,
     ANONYSTAT_USER_ID_SCRAMBLING_SECRET: forward.user_id?.scrambling_secret ??
       undefined,
-    ANONYSTAT_ALLOW_DEBUG: forward.allow_debug,
+    ANONYSTAT_ALLOW_DEBUG: stringOrUndefined(forward.allow_debug),
     ANONYSTAT_DESTINATION: forward.destination,
     ANONYSTAT_LISTEN_HOSTNAME: simplified.listen?.hostname,
-    ANONYSTAT_LISTEN_PORT: simplified.listen?.port,
+    ANONYSTAT_LISTEN_PORT: stringOrUndefined(simplified.listen?.port),
   };
 
   if ("measurement_id" in data_stream) {
@@ -49,4 +51,8 @@ export function getEnvars(config: Config): Result<ConfigEnv, GetEnvarsError> {
   }
 
   return { success: true, data: env };
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return value === undefined ? value : String(value);
 }

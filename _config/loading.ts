@@ -224,7 +224,9 @@ function loadConfigJsonValue(
   jsonValue: JsonValue,
   source: Source,
 ): Result<Config, LoadConfigError> {
-  const parseResult = Config.safeParse(jsonValue, { errorMap: customErrorMap });
+  const parseResult = Config.safeParse(jsonValue, {
+    errorMap: customErrorMap,
+  });
   if (!parseResult.success) {
     return {
       success: false,
@@ -273,8 +275,19 @@ function loadConfigEnv(rawEnv: EnvMap): Result<Config, LoadConfigError> {
     hostname: env.ANONYSTAT_LISTEN_HOSTNAME || undefined,
   };
 
+  const lifetime = env.ANONYSTAT_USER_ID_LIFETIME
+    ? {
+      count: env.ANONYSTAT_USER_ID_LIFETIME.count,
+      unit: env.ANONYSTAT_USER_ID_LIFETIME.unit,
+      from: env.ANONYSTAT_USER_ID_LIFETIME.from?.toISOString(),
+    }
+    : undefined;
+  if (lifetime && "from" in lifetime && lifetime.from === undefined) {
+    delete lifetime.from;
+  }
+
   const user_id: z.input<typeof UserIdConfig> = {
-    lifetime: env.ANONYSTAT_USER_ID_LIFETIME,
+    lifetime,
     existing: env.ANONYSTAT_USER_ID_EXISTING,
     scrambling_secret: env.ANONYSTAT_USER_ID_SCRAMBLING_SECRET,
   };
