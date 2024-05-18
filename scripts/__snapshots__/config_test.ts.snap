@@ -3,20 +3,57 @@ export const snapshot = {};
 snapshot[`--help shows help 1`] = `
 "out|Validate and print anonystat config.
 out|
-out|Usage: deno run config.ts [-hc] [-f <format>] [<file>]
+out|Usage:
+out|  Usage: deno run config.ts [-hc] [-f <format>] [<file>] [-e <name>[=<value>|*]]...
 out|
 out|Configuration is read from environment variables unless <file> is provided, in
 out|which case environment variables are ignored.
 out|
+out|Values in the config loaded from <file> (or the environment) can be overridden
+out|by -e <name>[=<value>|*] options naming ANONYSTAT_ environment variables. A glob
+out|indicates all matching environment variables override.
+out|
+out|Examples:
+out|
+out|  # Load & validate config from env vars, print as NAME=VALUE
+out|  config.ts
+out|
+out|  # Load & validate config from config.json, print as NAME=VALUE
+out|  config.ts config.json
+out|
+out|  # Load from config.json, overriding the scrambling secret from the environment
+out|  config.ts config.json -e ANONYSTAT_USER_ID_SCRAMBLING_SECRET
+out|
+out|  # Load from config.json, overriding the scrambling secret to be 'foo'
+out|  config.ts config.json -e ANONYSTAT_USER_ID_SCRAMBLING_SECRET=foo
+out|
+out|  # Load from config.json, overriding values that are also set as env vars
+out|  config.ts config.json -e 'ANONYSTAT_*'
+out|
+out|  # Load from config.json, output as JSON without indentation
+out|  config.ts config.json --format json --compact
+out|
+out|
 out|Arguments:
-out|  <file>:  Path of a json[c] config file.
+out|  <file>:
+out|    Path of a json[c] config file.
 out|
 out|Options:
-out|  -f, --format: The representation to print after validating. <format> is:
-out|                'env', 'env-json', 'env-vars', 'json', 'markdown'.
-out|                                                                [Default: 'env']
-out|  -c, --compact: Don't indent JSON output
-out|  -h, --help:    Show this help
+out|  -f <format>, --format <format>:
+out|    The representation to print after validating. <format> is:
+out|    'env', 'env-json', 'env-vars', 'json', 'markdown'.          [Default: 'env']
+out|
+out|  -c, --compact:
+out|    Don't indent JSON output
+out|
+out|  -e <name>[=<value>|*], --override <name>[=<value>|*]:
+out|    Name an ANONYSTAT_ environment variable that overrides config values
+out|    loaded from the environment or <file>. <name> can end with a * to match
+out|    multiple, or =<value> to use the provided value instead of the value in the
+out|    environment.
+out|
+out|  -h, --help:
+out|    Show this help
 out|"
 `;
 

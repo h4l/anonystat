@@ -1,3 +1,4 @@
+import { ConfigValueEnvarName } from "../config.ts";
 import {
   assertEquals,
   assertInstanceOf,
@@ -133,6 +134,82 @@ Deno.test("default format is 'env'", async () => {
   assertEquals(defaultOutput, envOutput);
 });
 
+Deno.test("-e/--override", async (t) => {
+  await t.step(
+    "non-in/out data stream values override both in and out",
+    async () => {
+      const a = await run({
+        inputFile: "../data/config_single.json",
+        override: {
+          ANONYSTAT_DATA_STREAM_API_SECRET: "overridden_secret",
+          ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "overridden_id",
+        },
+      });
+      const b = await run({
+        inputFile: "../data/config_single.json",
+        override: {
+          ANONYSTAT_DATA_STREAM_IN_API_SECRET: "overridden_secret",
+          ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "overridden_secret",
+          ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: "overridden_id",
+          ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: "overridden_id",
+        },
+      });
+      assertEquals(a, b);
+    },
+  );
+
+  await t.step(
+    "overrides replace all values from initial config",
+    async () => {
+      const vars: Record<ConfigValueEnvarName, string> = {
+        ANONYSTAT_ALLOW_DEBUG: "false",
+        ANONYSTAT_DATA_STREAM_API_SECRET: "overridden by in/out",
+        ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "overridden by in/out",
+        ANONYSTAT_DATA_STREAM_IN_API_SECRET: "s0",
+        ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "s1",
+        ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: "i0",
+        ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: "i1",
+        ANONYSTAT_DESTINATION: "https://override.example.com/mp/collect",
+        ANONYSTAT_LISTEN_HOSTNAME: "override.localhost",
+        ANONYSTAT_LISTEN_PORT: "9001",
+        ANONYSTAT_USER_ID_EXISTING: "keep",
+        ANONYSTAT_USER_ID_LIFETIME: "R/2024-01-01/P1W",
+        ANONYSTAT_USER_ID_SCRAMBLING_SECRET: "osec",
+      };
+      const a = await run({
+        // config_single has a value for every field
+        inputFile: "../data/config_single.json",
+        override: vars,
+      });
+      const b = await run({ env: vars });
+      // a overrides all existing values from the file with vars, so it should
+      // be equivalent to just loading the vars directly.
+      assertEquals(a, b);
+    },
+  );
+
+  await t.step(
+    "overrides are pulled from the environment when no =<value> is used",
+    async () => {
+      const a = await run({
+        inputFile: "../data/config_minimal.json",
+        env: {
+          ANONYSTAT_LISTEN_HOSTNAME: "foo",
+        },
+        override: { "*": null },
+      });
+      const b = await run({
+        env: {
+          ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "G-ABCDE12345",
+          ANONYSTAT_DATA_STREAM_API_SECRET: "Ab12Ab12Ab12Ab12Ab12Ab",
+          ANONYSTAT_LISTEN_HOSTNAME: "foo",
+        },
+      });
+      assertEquals(a, b);
+    },
+  );
+});
+
 type Format = "markdown" | "json" | "env" | "env-json" | "env-vars";
 
 async function run(
@@ -141,6 +218,8 @@ async function run(
     inputFile?: string;
     exitCode?: number;
     compact?: boolean;
+    env?: Partial<Record<ConfigValueEnvarName, string>>;
+    override?: Partial<Record<ConfigValueEnvarName | "*", string | null>>;
   },
 ): Promise<string> {
   const args: string[] = [];
@@ -151,9 +230,14 @@ async function run(
   if (options.inputFile !== undefined) {
     args.push(fromFileUrl(import.meta.resolve(options.inputFile)));
   }
+  for (const [name, value] of Object.entries(options.override ?? {})) {
+    if (value === undefined) continue;
+    if (value === null) args.push("-e", name);
+    else args.push("-e", `${name}=${value}`);
+  }
 
   using consoleOutput = new ConsoleOutputCapturer();
-  using _env = OverrideEnv.withObj({});
+  using _env = OverrideEnv.withObj(options.env ?? {});
   await assertExits(
     main(args),
     options.exitCode ?? 0,
