@@ -4,3 +4,4 @@
 *.lcov
 /cov_profile
 /html_cov
+/dist

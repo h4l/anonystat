@@ -12,7 +12,8 @@
     "clean-cov": "rm -rf html_cov cov.lcov cov_profile",
     "cov-html": "deno coverage --lcov --output=cov.lcov cov_profile/ && genhtml -o html_cov cov.lcov",
     "serve-cov": "deno run --allow-net --allow-read --allow-sys https://deno.land/std/http/file_server.ts html_cov",
-    "cov": "deno task clean-cov && deno task test-cov && deno task cov-html && deno task serve-cov"
+    "cov": "deno task clean-cov && deno task test-cov && deno task cov-html && deno task serve-cov",
+    "build": "scripts/build.sh"
   },
   "deploy": {
     "exclude": [
