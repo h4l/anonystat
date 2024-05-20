@@ -21,6 +21,12 @@ Anonystat is new and probably has some rough edges!
 
 ## Deploy
 
+To manage a long-term deployment, create yourself a copy of the
+[anonystat-deploy-template](https://github.com/h4l/anonystat-deploy-template)
+repo.
+
+Or you can deploy manually:
+
 1. Clone this git repository
 2. Follow [Deno Deploy Quick Start] to install the `deno` and `deployctl` CLI
    tools
