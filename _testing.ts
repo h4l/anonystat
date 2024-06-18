@@ -157,3 +157,7 @@ export function ignoredRejectedPromise(
   completed.catch(() => {}); // ignore
   return completed;
 }
+
+export function assertNull(actual: unknown): void {
+  assertEquals(actual, null);
+}
