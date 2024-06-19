@@ -102,12 +102,12 @@ out|ANONYSTAT_DATA_STREAM_OUT_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab"
 
 snapshot[`--format env represents configs with multiple forwarding rule as JSON var 1`] = `
 'out|ANONYSTAT_CONFIG_SOURCE=json
-out|ANONYSTAT_CONFIG={"forward":[{"data_stream":[{"in":{"measurement_id":"mid1","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout1","api_secret":"defaultsecret888"}},{"in":{"measurement_id":"mid2","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout2","api_secret":"defaultsecret888"}}],"user_id":{"lifetime":"2 weeks","scrambling_secret":"foobarbaz4"},"allow_debug":true,"destination":"https://lol/foo/123"},{"data_stream":{"in":{"measurement_id":"mid3","api_secret":"defaultsecret999"},"out":{"measurement_id":"midout1","api_secret":"defaultsecret888"}},"destination":"https://example.com/foo/123"}],"listen":{"hostname":"1.2.3.4","port":9000}}'
+out|ANONYSTAT_CONFIG={"forward":[{"data_stream":[{"in":{"api_secret":"defaultsecret999","measurement_id":"mid1"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},{"in":{"api_secret":"defaultsecret999","measurement_id":"mid2"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout2"}}],"user_id":{"lifetime":"2 weeks","scrambling_secret":"foobarbaz4"},"allow_debug":true,"destination":"https://lol/foo/123"},{"data_stream":{"in":{"api_secret":"defaultsecret999","measurement_id":"mid3"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},"destination":"https://example.com/foo/123"}],"listen":{"hostname":"1.2.3.4","port":9000}}'
 `;
 
 snapshot[`--format env-json represents configs with one forwarding rule as JSON var 1`] = `
 'out|ANONYSTAT_CONFIG_SOURCE=json
-out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"measurement_id":"foo","api_secret":"secret123"},"out":{"measurement_id":"G-ABCDE12345","api_secret":"Ab12Ab12Ab12Ab12Ab12Ab"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect"},"listen":{"hostname":"1.2.3.4","port":9000}}'
+out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"api_secret":"secret123","measurement_id":"foo"},"out":{"api_secret":"Ab12Ab12Ab12Ab12Ab12Ab","measurement_id":"G-ABCDE12345"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect"},"listen":{"hostname":"1.2.3.4","port":9000}}'
 `;
 
 snapshot[`--format json prints indented JSON 1`] = `
@@ -141,12 +141,12 @@ out|    {
 out|      "data_stream": [
 out|        {
 out|          "in": {
-out|            "measurement_id": "G-ABCDE12345",
-out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab",
+out|            "measurement_id": "G-ABCDE12345"
 out|          },
 out|          "out": {
-out|            "measurement_id": "G-ABCDE12345",
-out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab"
+out|            "api_secret": "Ab12Ab12Ab12Ab12Ab12Ab",
+out|            "measurement_id": "G-ABCDE12345"
 out|          }
 out|        }
 out|      ],

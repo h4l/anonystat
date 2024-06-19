@@ -15,8 +15,8 @@ import {
 } from "./lifetimes.ts";
 
 export const DataStreamCredentials = z.object({
-  measurement_id: NonEmptyString,
   api_secret: NonEmptyString,
+  measurement_id: NonEmptyString,
 });
 
 export const DataStreamInOut = z.object({
