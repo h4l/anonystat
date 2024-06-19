@@ -44,22 +44,20 @@ export const RawConfigEnv = z.object({
   ANONYSTAT_DATA_STREAM_API_SECRET: EmptyStringAsUndefined.optional(),
   ANONYSTAT_DATA_STREAM_IN_API_SECRET: EmptyStringAsUndefined.optional(),
   ANONYSTAT_DATA_STREAM_OUT_API_SECRET: EmptyStringAsUndefined.optional(),
-  ANONYSTAT_DESTINATION: EmptyStringAsUndefined.pipe(DestinationUrl).optional(),
-  ANONYSTAT_ALLOW_DEBUG: EmptyStringAsUndefined.pipe(EnvBool).optional(),
-  ANONYSTAT_USER_ID_SCRAMBLING_SECRET: EmptyStringAsUndefined.pipe(
-    ScramblerKey,
-  ).optional(),
-  ANONYSTAT_USER_ID_LIFETIME: EmptyStringAsUndefined.pipe(
+  ANONYSTAT_DESTINATION: emptyStringAsUndefined(DestinationUrl),
+  ANONYSTAT_ALLOW_DEBUG: emptyStringAsUndefined(EnvBool),
+  ANONYSTAT_USER_ID_SCRAMBLING_SECRET: emptyStringAsUndefined(ScramblerKey),
+  ANONYSTAT_USER_ID_LIFETIME: emptyStringAsUndefined(
     EvaluatedDisambiguatedLifetimeExpression,
-  ).optional(),
-  ANONYSTAT_USER_ID_EXISTING: EmptyStringAsUndefined.pipe(ExistingIdPolicy)
+  ),
+  ANONYSTAT_USER_ID_EXISTING: emptyStringAsUndefined(ExistingIdPolicy)
     .optional(),
   ANONYSTAT_CORS_ALLOW_ORIGIN: emptyStringAsUndefined(AllowOriginEnvar),
   ANONYSTAT_CORS_MAX_AGE: emptyStringAsUndefined(MaxAge),
-  ANONYSTAT_LISTEN_PORT: EmptyStringAsUndefined.pipe(DecimalIntFromString).pipe(
-    Port,
-  ).optional(),
-  ANONYSTAT_LISTEN_HOSTNAME: EmptyStringAsUndefined.pipe(Host).optional(),
+  ANONYSTAT_LISTEN_PORT: emptyStringAsUndefined(
+    DecimalIntFromString.pipe(Port),
+  ),
+  ANONYSTAT_LISTEN_HOSTNAME: emptyStringAsUndefined(Host),
 });
 export type ConfigValueEnvarName = keyof typeof RawConfigEnv.shape;
 export const configValueEnvarNames = Object.keys(

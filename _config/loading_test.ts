@@ -140,13 +140,19 @@ Deno.test("loadConfig()", async (t) => {
     await t.step("empty envars are undefined", async () => {
       const configLoad = await loadConfig({
         env: envMap<Record<ConfigValueEnvarName, string>>({
-          // FIXME: the rest of these can't currently be empty strings
+          ANONYSTAT_ALLOW_DEBUG: "",
           ANONYSTAT_DATA_STREAM_IN_API_SECRET: "",
           ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "",
           ANONYSTAT_DATA_STREAM_API_SECRET: "hunter2",
           ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: "",
           ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: "",
           ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "abc123",
+          ANONYSTAT_DESTINATION: "",
+          ANONYSTAT_LISTEN_HOSTNAME: "",
+          ANONYSTAT_LISTEN_PORT: "",
+          ANONYSTAT_USER_ID_EXISTING: "",
+          ANONYSTAT_USER_ID_LIFETIME: "",
+          ANONYSTAT_USER_ID_SCRAMBLING_SECRET: "",
           ANONYSTAT_CORS_ALLOW_ORIGIN: "",
           ANONYSTAT_CORS_MAX_AGE: "",
         }),
