@@ -11,9 +11,10 @@ import { assertEquals, assertNotEquals, FakeTime, stub } from "../dev_deps.ts";
 import { AnyPayload } from "../payload_schemas.ts";
 import { HandlerRequest } from "../requests.ts";
 import { createCollectRequestMatcherFromConfig } from "./from_config.ts";
-import { Config } from "./json_schema.ts";
+import { Config, DEFAULT_CORS_MAX_AGE } from "./json_schema.ts";
 
 import { StatusCodes } from "../deps.ts";
+import { CorsResponseHeader, Wildcard } from "../_cors.ts";
 
 Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
   const kv = await Deno.openKv(":memory:");
@@ -49,6 +50,7 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
       api_secret?: string;
       user_id?: string;
       debug?: boolean;
+      originHeader?: string;
     } = {},
   ): HandlerRequest {
     const completed = Promise.reject("not used");
@@ -63,11 +65,12 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
     const request = new Request(mpCollectUrl(options), {
       method: "POST",
       body: JSON.stringify(payload),
-      headers: [
-        ["content-type", "application/json"],
-        ["User-Agent", "Example/1.0"],
-        ["Accept-Language", "en-GB,en;q=0.8"],
-      ],
+      headers: {
+        "content-type": "application/json",
+        "User-Agent": "Example/1.0",
+        "Accept-Language": "en-GB,en;q=0.8",
+        ...(options.originHeader && { "Origin": options.originHeader }),
+      },
     });
 
     return {
@@ -88,7 +91,11 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
             out: { measurement_id: "a_out", api_secret: "a_out_sec" },
           },
           {
-            in: { measurement_id: "b_in", api_secret: "b_in_sec" },
+            in: {
+              measurement_id: "b_in",
+              api_secret: "b_in_sec",
+              cors: { allow_origin: ["https://b.example.com"] },
+            },
             out: { measurement_id: "b_out", api_secret: "b_out_sec" },
           },
         ],
@@ -103,7 +110,11 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
       {
         data_stream: [
           {
-            in: { measurement_id: "a_in", api_secret: "a_in_sec2" },
+            in: {
+              measurement_id: "a_in",
+              api_secret: "a_in_sec2",
+              cors: { allow_origin: ["https://a.example.com"], max_age: 120 },
+            },
             out: { measurement_id: "a_out", api_secret: "a_out_sec" },
           },
           {
@@ -118,6 +129,7 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
           lifetime: { count: 1, unit: "hours" },
           scrambling_secret: null,
         },
+        cors: { allow_origin: Wildcard, max_age: 60 * 60 },
       },
     ],
     listen: { hostname: "0.0.0.0", port: 1234 },
@@ -351,5 +363,154 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
     assertNotEquals(id0, id2);
   });
 
+  await t.step("CORS / OPTIONS requests", async (t) => {
+    async function sendOptionsRequest(
+      request: HandlerRequest,
+    ): Promise<Response> {
+      const optionsRequest = createOptionsRequest(request);
+
+      using fetch = stubFetch();
+      const result = await matcher.match(optionsRequest);
+      assertSuccessful(result);
+      const response = await result.data.respond();
+
+      assertEquals(
+        fetch.calls.length,
+        0,
+        "unexpectedly",
+      );
+
+      return response;
+    }
+
+    const params: {
+      name: string;
+      request: {
+        measurement_id: string;
+        api_secret: string;
+        origin?: string;
+      };
+      response: {
+        status: number;
+        allowOrigin: string | null;
+        maxAge: number | null;
+      };
+    }[] = [
+      {
+        name: "data stream without cors does not handle OPTIONS requests",
+        request: {
+          measurement_id: "a_in",
+          api_secret: "a_in_sec1",
+          origin: undefined,
+        },
+        response: {
+          status: StatusCodes.METHOD_NOT_ALLOWED,
+          allowOrigin: null,
+          maxAge: null,
+        },
+      },
+      {
+        name: "data stream with cors and no inherited cors allows own origin",
+        request: {
+          measurement_id: "b_in",
+          api_secret: "b_in_sec",
+          origin: "https://b.example.com",
+        },
+        response: {
+          status: StatusCodes.NO_CONTENT,
+          allowOrigin: "https://b.example.com",
+          maxAge: DEFAULT_CORS_MAX_AGE,
+        },
+      },
+      {
+        name: "data stream with cors and inherited cors allows own origin",
+        request: {
+          measurement_id: "a_in",
+          api_secret: "a_in_sec2",
+          origin: "https://a.example.com",
+        },
+        response: {
+          status: StatusCodes.NO_CONTENT,
+          allowOrigin: "https://a.example.com",
+          maxAge: 120,
+        },
+      },
+      {
+        name:
+          "data stream with cors and inherited cors does not allow overridden origin",
+        request: {
+          measurement_id: "a_in",
+          api_secret: "a_in_sec2",
+          origin: "https://other.example.com",
+        },
+        response: {
+          status: StatusCodes.NO_CONTENT,
+          allowOrigin: null,
+          maxAge: 120,
+        },
+      },
+      {
+        name:
+          "data stream without own cors and inherited cors allows inherited origin",
+        request: {
+          measurement_id: "c_in",
+          api_secret: "c_in_sec",
+          origin: "https://other.example.com",
+        },
+        response: {
+          status: StatusCodes.NO_CONTENT,
+          allowOrigin: "*",
+          maxAge: 60 * 60,
+        },
+      },
+    ];
+
+    for (const p of params) {
+      await t.step(p.name, async () => {
+        const response = await sendOptionsRequest(createRequest({
+          api_secret: p.request.api_secret,
+          measurement_id: p.request.measurement_id,
+          originHeader: p.request.origin,
+        }));
+
+        assertEquals(response.status, p.response.status);
+        assertEquals(
+          response.headers.get("Access-Control-Allow-Origin"),
+          p.response.allowOrigin,
+        );
+        assertEquals(
+          response.headers.get("Access-Control-Max-Age"),
+          p.response.maxAge === null ? null : `${p.response.maxAge}`,
+        );
+        // Our CORS responses always allow credentials because
+        // Navigator.sendBeacon() requires it.
+        assertEquals(
+          response.headers.get(CorsResponseHeader.allowCredentials),
+          p.response.status === StatusCodes.METHOD_NOT_ALLOWED ? null : "true",
+        );
+        // CORS responses need to allow Content-Type headers, as requests set
+        // Content-Type: application/json, which is not CORS-safe.
+        assertEquals(
+          response.headers.get(CorsResponseHeader.allowHeaders),
+          p.response.status === StatusCodes.METHOD_NOT_ALLOWED
+            ? null
+            : "Content-Type",
+        );
+      });
+    }
+  });
+
   kv.close();
 });
+
+/** Create an HTTP OPTIONS method request version of another request.  */
+function createOptionsRequest(
+  { info, request }: HandlerRequest,
+): HandlerRequest {
+  const optionsRequest = new Request(request.url, {
+    method: "OPTIONS",
+    headers: request.headers,
+  });
+
+  return { info, request: optionsRequest };
+}

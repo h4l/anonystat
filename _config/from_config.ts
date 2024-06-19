@@ -7,10 +7,50 @@ import {
 } from "../rules.ts";
 import { RequestMatchError } from "../types.ts";
 import { defaultProxyOptions, DefaultRequestForwarder } from "../default.ts";
-import { Config } from "./json_schema.ts";
+import { Config, Cors, DEFAULT_CORS_MAX_AGE } from "./json_schema.ts";
 import { AnonymisationProvider } from "../anonymisation.ts";
+import {
+  CorsMiddleware,
+  CorsPolicy,
+  DefaultCorsPolicy,
+  HttpMethods,
+} from "../_cors.ts";
 
 export type CreateCollectRequestMatcherFromConfigOptions = { kv?: Deno.Kv };
+
+function createCorsPolicy(cors: Cors): CorsPolicy | undefined {
+  if (cors.allow_origin === undefined && cors.max_age === undefined) return;
+  return new DefaultCorsPolicy({
+    allowOrigin: cors.allow_origin ?? null,
+    maxAge: cors.max_age ?? DEFAULT_CORS_MAX_AGE,
+    allowMethods: HttpMethods.POST,
+    // Navigator.sendBeacon() makes CORS requests with credentials mode include,
+    // so we must allow credentials to make cross-origin sendBeacon() requests:
+    // https://w3c.github.io/beacon/#sec-processing-model  (see step 3.2.7.1)
+    // In practice we don't set any cookies, so this should have no real effect.
+    allowCredentials: true,
+    // Requests set Content-Type header to send JSON
+    allowHeaders: ["Content-Type"],
+  });
+}
+
+/** Merge two Cors configs by overriding `base` with props set in `override`.
+ *
+ * @return The merged config, or undefined if override has no effect.
+ */
+function mergeCorsConfigs(
+  base: Cors | undefined,
+  override: Cors | undefined,
+): Cors | undefined {
+  if (override?.allow_origin === undefined && override?.max_age === undefined) {
+    return undefined;
+  }
+  return {
+    ...base,
+    ...(override.allow_origin && { allow_origin: override.allow_origin }),
+    ...(override.max_age && { max_age: override.max_age }),
+  };
+}
 
 /** Instantiate Config data into a request matcher to handle collect requests.
  */
@@ -39,7 +79,28 @@ export async function createCollectRequestMatcherFromConfig(
       ),
     });
 
+    const corsPolicy = fwConfig.cors && createCorsPolicy(fwConfig.cors);
+
+    // CORS is optional. If it's enabled we support it by wrapping the forwarder
+    // with CorsMiddleware to set CORS headers.
+    const forwarder = corsPolicy
+      ? new CorsMiddleware(requestForwarder, {
+        corsPolicy,
+      })
+      : requestForwarder;
+
     return fwConfig.data_stream.map((dsConfig) => {
+      // Individual data streams can override the shared CORS policy, in which
+      // case we merge the CORS configs and wrap the same basic requestForwarder
+      // with a CORS middleware specific to this data stream.
+      const dsCorsConfig = mergeCorsConfigs(fwConfig.cors, dsConfig.in.cors);
+      const dsCorsPolicy = dsCorsConfig && createCorsPolicy(dsCorsConfig);
+      const dsForwarder = dsCorsPolicy
+        ? new CorsMiddleware(requestForwarder, {
+          corsPolicy: dsCorsPolicy,
+        })
+        : forwarder;
+
       const rule = DefaultCollectRequestForwardingRule.create({
         // add extra info to request metadata needed by the anonymisation
         // payload parser when it constructs anonymous IDs.
@@ -53,7 +114,7 @@ export async function createCollectRequestMatcherFromConfig(
           endpoint: fwConfig.destination,
         },
         allowDebug: fwConfig.allow_debug,
-        forwarder: requestForwarder,
+        forwarder: dsForwarder,
       });
       return [dsConfig.in.measurement_id, rule] as const;
     });
