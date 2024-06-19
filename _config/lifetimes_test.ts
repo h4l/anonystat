@@ -95,7 +95,7 @@ Deno.test("ValidatedDisambiguatedLifetimeExpression", async (t) => {
     "rejects invalid simple period with appropriate message",
     async (t) => {
       const result = ValidatedDisambiguatedLifetimeExpression.safeParse(
-        "3 seconds",
+        "3 nanoseconds",
       );
       assertUnsuccessful(result);
       await assertSnapshot(t, joinedErrorMessages(result.error));
