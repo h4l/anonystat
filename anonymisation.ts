@@ -219,6 +219,8 @@ interface TimeBucket {
 }
 
 export const TimeUnit = z.enum([
+  "seconds",
+  "minutes",
   "hours",
   "days",
   "weeks",

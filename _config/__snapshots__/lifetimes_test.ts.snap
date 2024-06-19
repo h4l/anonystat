@@ -1,5 +1,5 @@
 export const snapshot = {};
 
-snapshot[`ValidatedDisambiguatedLifetimeExpression > rejects invalid simple period with appropriate message 1`] = `\`Value must be "[<number>] <unit>" where number is 1+ and unit is one of hours, days, weeks, months, quarters, years (ignoring case, with or without 's'); Value must be an interval like "2 weeks" or an ISO interval with a start time, like "R/2024-01-01/P2W"\``;
+snapshot[`ValidatedDisambiguatedLifetimeExpression > rejects invalid simple period with appropriate message 1`] = `\`Value must be "[<number>] <unit>" where number is 1+ and unit is one of seconds, minutes, hours, days, weeks, months, quarters, years (ignoring case, with or without 's'); Value must be an interval like "2 weeks" or an ISO interval with a start time, like "R/2024-01-01/P2W"\``;
 
 snapshot[`ValidatedDisambiguatedLifetimeExpression > rejects invalid non-simple period with appropriate message 1`] = `'Value is not an ISO 8601 interval with a single period; Value must be an interval like "2 weeks" or an ISO interval with a start time, like "R/2024-01-01/P2W"'`;

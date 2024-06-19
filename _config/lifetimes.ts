@@ -31,7 +31,9 @@ const UtcDateOrDateTime = z.string().transform((arg, ctx) => {
 const possibleTimeUnitMessage = Object.values(TimeUnit.Enum).join(", ");
 
 function parseLaxTimeUnit(value: string): TimeUnit | undefined {
-  const match = /(hour|day|week|month|quarter|year)s?/i.exec(value);
+  const match = /(second|minute|hour|day|week|month|quarter|year)s?/i.exec(
+    value,
+  );
   if (!match) return undefined;
   return `${match[1].toLowerCase()}s` as TimeUnit;
 }
