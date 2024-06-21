@@ -1,8 +1,8 @@
 import { ConfigValueEnvarName } from "../config.ts";
+import { assert } from "../deps.ts";
 import {
   assertEquals,
   assertInstanceOf,
-  assertMatch,
   assertSnapshot,
   fromFileUrl,
   Stub,
@@ -12,7 +12,7 @@ import { main } from "./config.ts";
 
 Deno.test("--help shows help", async (t) => {
   using consoleOutput = new ConsoleOutputCapturer();
-  await assertExits(main(["--help"]), 0);
+  await assertExits(() => main(["--help"]), 0, consoleOutput);
   await assertSnapshot(t, consoleOutput.getMergedOutput());
 });
 
@@ -24,7 +24,7 @@ Deno.test("loads config from environment", async (t) => {
     ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: "c",
     ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "d",
   });
-  await assertExits(main([]), 0);
+  await assertExits(() => main([]), 0, consoleOutput);
   await assertSnapshot(t, consoleOutput.getMergedOutput());
 });
 
@@ -32,22 +32,27 @@ Deno.test("loads config from argument file", async (t) => {
   using consoleOutput = new ConsoleOutputCapturer();
   using _env = OverrideEnv.withObj({});
   await assertExits(
-    main([fromFileUrl(import.meta.resolve("../data/config_minimal.json"))]),
+    () =>
+      main([fromFileUrl(import.meta.resolve("../data/config_minimal.json"))]),
     0,
+    consoleOutput,
   );
   await assertSnapshot(t, consoleOutput.getMergedOutput());
 });
 
-Deno.test("--format env-vars cannot represent configs with multiple forwarding rules", async (t) => {
-  await assertSnapshot(
-    t,
-    await run({
-      format: "env-vars",
-      inputFile: "../data/config_multiple.json",
-      exitCode: 1,
-    }),
-  );
-});
+Deno.test(
+  "--format env-vars cannot represent configs with multiple forwarding rules",
+  async (t) => {
+    await assertSnapshot(
+      t,
+      await run({
+        format: "env-vars",
+        inputFile: "../data/config_multiple.json",
+        exitCode: 1,
+      }),
+    );
+  },
+);
 
 Deno.test("--format env-vars represents configs with one forwarding rule as individual vars", async (t) => {
   await assertSnapshot(
@@ -241,24 +246,41 @@ async function run(
   using consoleOutput = new ConsoleOutputCapturer();
   using _env = OverrideEnv.withObj(options.env ?? {});
   await assertExits(
-    main(args),
+    () => main(args),
     options.exitCode ?? 0,
+    consoleOutput,
   );
   return consoleOutput.getMergedOutput();
 }
 
+class MockExit extends Error {
+  constructor(readonly code: number = 0) {
+    super(`Deno.exit(${code})`);
+  }
+}
+
 async function assertExits(
-  promise: PromiseLike<void>,
+  fn: () => PromiseLike<void>,
   code: number,
+  consoleOutput: ConsoleOutputCapturer,
 ): Promise<void> {
+  using _exit = stub(Deno, "exit", (code) => {
+    throw new MockExit(code);
+  });
+
   try {
-    return await promise;
+    await fn();
   } catch (e) {
-    assertInstanceOf(e, Error);
-    assertMatch(
-      e.message,
-      new RegExp(`\\bTest case attempted to exit with exit code: ${code}\\b`),
+    assertInstanceOf(e, MockExit);
+    assertEquals(
+      e.code,
+      code,
+      `expected Deno.exit(${code}) but was Deno.exit(${e.code}); output:\n${consoleOutput.getMergedOutput()}`,
     );
+    return;
+  }
+  if (code !== 0) {
+    assert(false, "promise did not call Deno.exit()");
   }
 }
 
