@@ -80,6 +80,8 @@ out|ANONYSTAT_ALLOW_DEBUG=true
 out|ANONYSTAT_DESTINATION=https://example.com/mp/collect
 out|ANONYSTAT_LISTEN_HOSTNAME=1.2.3.4
 out|ANONYSTAT_LISTEN_PORT=9000
+out|ANONYSTAT_CORS_ALLOW_ORIGIN=example.com
+out|ANONYSTAT_CORS_MAX_AGE=120
 out|ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=foo
 out|ANONYSTAT_DATA_STREAM_IN_API_SECRET=secret123
 out|ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=G-ABCDE12345
@@ -94,6 +96,8 @@ out|ANONYSTAT_ALLOW_DEBUG=true
 out|ANONYSTAT_DESTINATION=https://example.com/mp/collect
 out|ANONYSTAT_LISTEN_HOSTNAME=1.2.3.4
 out|ANONYSTAT_LISTEN_PORT=9000
+out|ANONYSTAT_CORS_ALLOW_ORIGIN=example.com
+out|ANONYSTAT_CORS_MAX_AGE=120
 out|ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID=foo
 out|ANONYSTAT_DATA_STREAM_IN_API_SECRET=secret123
 out|ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID=G-ABCDE12345
@@ -102,12 +106,12 @@ out|ANONYSTAT_DATA_STREAM_OUT_API_SECRET=Ab12Ab12Ab12Ab12Ab12Ab"
 
 snapshot[`--format env represents configs with multiple forwarding rule as JSON var 1`] = `
 'out|ANONYSTAT_CONFIG_SOURCE=json
-out|ANONYSTAT_CONFIG={"forward":[{"data_stream":[{"in":{"api_secret":"defaultsecret999","measurement_id":"mid1"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},{"in":{"api_secret":"defaultsecret999","measurement_id":"mid2"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout2"}}],"user_id":{"lifetime":"2 weeks","scrambling_secret":"foobarbaz4"},"allow_debug":true,"destination":"https://lol/foo/123"},{"data_stream":{"in":{"api_secret":"defaultsecret999","measurement_id":"mid3"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},"destination":"https://example.com/foo/123"}],"listen":{"hostname":"1.2.3.4","port":9000}}'
+out|ANONYSTAT_CONFIG={"forward":[{"data_stream":[{"in":{"api_secret":"defaultsecret999","measurement_id":"mid1","cors":{"allow_origin":["localhost"]}},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},{"in":{"api_secret":"defaultsecret999","measurement_id":"mid2"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout2"}}],"user_id":{"lifetime":"2 weeks","scrambling_secret":"foobarbaz4"},"allow_debug":true,"destination":"https://lol/foo/123","cors":{"allow_origin":"/https:\\\\\\\\/\\\\\\\\/.+\\\\\\\\.example.com/"}},{"data_stream":{"in":{"api_secret":"defaultsecret999","measurement_id":"mid3"},"out":{"api_secret":"defaultsecret888","measurement_id":"midout1"}},"destination":"https://example.com/foo/123"}],"listen":{"hostname":"1.2.3.4","port":9000}}'
 `;
 
 snapshot[`--format env-json represents configs with one forwarding rule as JSON var 1`] = `
 'out|ANONYSTAT_CONFIG_SOURCE=json
-out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"api_secret":"secret123","measurement_id":"foo"},"out":{"api_secret":"Ab12Ab12Ab12Ab12Ab12Ab","measurement_id":"G-ABCDE12345"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect"},"listen":{"hostname":"1.2.3.4","port":9000}}'
+out|ANONYSTAT_CONFIG={"forward":{"data_stream":{"in":{"api_secret":"secret123","measurement_id":"foo"},"out":{"api_secret":"Ab12Ab12Ab12Ab12Ab12Ab","measurement_id":"G-ABCDE12345"}},"user_id":{"existing":"replace","lifetime":{"count":2,"unit":"months","from":"2024-02-14"},"scrambling_secret":"0000000"},"allow_debug":true,"destination":"https://example.com/mp/collect","cors":{"allow_origin":["example.com"],"max_age":120}},"listen":{"hostname":"1.2.3.4","port":9000}}'
 `;
 
 snapshot[`--format json prints indented JSON 1`] = `

@@ -75,8 +75,219 @@ Deno.test("simplifyConfig()", async (t) => {
       }],
       listen: { hostname: DEFAULT_HOSTNAME, port: DEFAULT_PORT },
     };
-    await assertEquals(JSON.parse(JSON.stringify(simplifyConfig(config))), {
+    await assertEquals(removeUndefined(simplifyConfig(config)), {
       forward: { data_stream: { measurement_id: "a", api_secret: "b" } },
     });
   });
+
+  await t.step("cors", async (t) => {
+    await t.step("omits redundant data_stream cors", async () => {
+      const config: Config = {
+        forward: [{
+          data_stream: [{
+            in: {
+              measurement_id: "a",
+              api_secret: "b",
+              cors: { allow_origin: ["https://example.com"], max_age: 3600 },
+            },
+            out: { measurement_id: "a", api_secret: "b" },
+          }, {
+            in: {
+              measurement_id: "c",
+              api_secret: "d",
+              cors: { allow_origin: ["https://example.com"], max_age: 3600 },
+            },
+            out: { measurement_id: "c", api_secret: "d" },
+          }],
+          cors: { allow_origin: ["https://example.com"], max_age: 3600 },
+          user_id: {
+            existing: DEFAULT_EXISTING_POLICY,
+            lifetime: {
+              unit: DEFAULT_LIFETIME_UNIT,
+              count: 1,
+              from: new Date(0),
+            },
+            scrambling_secret: null,
+          },
+          allow_debug: false,
+          destination: GA4MP_URL,
+        }],
+        listen: { hostname: DEFAULT_HOSTNAME, port: DEFAULT_PORT },
+      };
+
+      await assertEquals(removeUndefined(simplifyConfig(config)), {
+        forward: {
+          data_stream: [{ measurement_id: "a", api_secret: "b" }, {
+            measurement_id: "c",
+            api_secret: "d",
+          }],
+          cors: { allow_origin: ["example.com"], max_age: 3600 },
+        },
+      });
+    });
+
+    await t.step("omits redundant forward cors", async () => {
+      const config: Config = {
+        forward: [{
+          data_stream: [{
+            in: {
+              measurement_id: "a",
+              api_secret: "b",
+              cors: { allow_origin: ["https://a.example.com"], max_age: 120 },
+            },
+            out: { measurement_id: "a", api_secret: "b" },
+          }, {
+            in: {
+              measurement_id: "c",
+              api_secret: "d",
+              cors: { allow_origin: ["https://b.example.com"], max_age: 180 },
+            },
+            out: { measurement_id: "c", api_secret: "d" },
+          }],
+          cors: { allow_origin: ["https://example.com"], max_age: 60 },
+          user_id: {
+            existing: DEFAULT_EXISTING_POLICY,
+            lifetime: {
+              unit: DEFAULT_LIFETIME_UNIT,
+              count: 1,
+              from: new Date(0),
+            },
+            scrambling_secret: null,
+          },
+          allow_debug: false,
+          destination: GA4MP_URL,
+        }],
+        listen: { hostname: DEFAULT_HOSTNAME, port: DEFAULT_PORT },
+      };
+
+      await assertEquals(removeUndefined(simplifyConfig(config)), {
+        forward: {
+          data_stream: [{
+            measurement_id: "a",
+            api_secret: "b",
+            cors: { allow_origin: ["a.example.com"], max_age: 120 },
+          }, {
+            measurement_id: "c",
+            api_secret: "d",
+            cors: { allow_origin: ["b.example.com"], max_age: 180 },
+          }],
+        },
+      });
+    });
+
+    await t.step("keeps effectual forward cors", async (t) => {
+      await t.step(
+        "removes redundant overrides & keeps effectual everrides",
+        async () => {
+          // The cors configs in the data_stream objects override one of two
+          // properties of on the cors config in the forwarder object, so all 3 of
+          // them are kept. But redundant properties are dropped from data_stream
+          // cors.
+          const config: Config = {
+            forward: [{
+              data_stream: [{
+                in: {
+                  measurement_id: "a",
+                  api_secret: "b",
+                  cors: { allow_origin: ["https://example.com"], max_age: 120 },
+                },
+                out: { measurement_id: "a", api_secret: "b" },
+              }, {
+                in: {
+                  measurement_id: "c",
+                  api_secret: "d",
+                  cors: {
+                    allow_origin: ["https://b.example.com"],
+                    max_age: 60,
+                  },
+                },
+                out: { measurement_id: "c", api_secret: "d" },
+              }],
+              cors: { allow_origin: ["https://example.com"], max_age: 60 },
+              user_id: {
+                existing: DEFAULT_EXISTING_POLICY,
+                lifetime: {
+                  unit: DEFAULT_LIFETIME_UNIT,
+                  count: 1,
+                  from: new Date(0),
+                },
+                scrambling_secret: null,
+              },
+              allow_debug: false,
+              destination: GA4MP_URL,
+            }],
+            listen: { hostname: DEFAULT_HOSTNAME, port: DEFAULT_PORT },
+          };
+
+          await assertEquals(removeUndefined(simplifyConfig(config)), {
+            forward: {
+              cors: { allow_origin: ["example.com"], max_age: 60 },
+              data_stream: [{
+                measurement_id: "a",
+                api_secret: "b",
+                cors: { max_age: 120 },
+              }, {
+                measurement_id: "c",
+                api_secret: "d",
+                cors: { allow_origin: ["b.example.com"] },
+              }],
+            },
+          });
+        },
+      );
+
+      await t.step(
+        "keeps forwarder cors with no data_stream cors",
+        async () => {
+          const config: Config = {
+            forward: [{
+              data_stream: [{
+                in: {
+                  measurement_id: "a",
+                  api_secret: "b",
+                },
+                out: { measurement_id: "a", api_secret: "b" },
+              }, {
+                in: {
+                  measurement_id: "c",
+                  api_secret: "d",
+                },
+                out: { measurement_id: "c", api_secret: "d" },
+              }],
+              cors: { allow_origin: ["https://example.com"], max_age: 60 },
+              user_id: {
+                existing: DEFAULT_EXISTING_POLICY,
+                lifetime: {
+                  unit: DEFAULT_LIFETIME_UNIT,
+                  count: 1,
+                  from: new Date(0),
+                },
+                scrambling_secret: null,
+              },
+              allow_debug: false,
+              destination: GA4MP_URL,
+            }],
+            listen: { hostname: DEFAULT_HOSTNAME, port: DEFAULT_PORT },
+          };
+
+          await assertEquals(removeUndefined(simplifyConfig(config)), {
+            forward: {
+              cors: { allow_origin: ["example.com"], max_age: 60 },
+              data_stream: [{
+                measurement_id: "a",
+                api_secret: "b",
+              }, {
+                measurement_id: "c",
+                api_secret: "d",
+              }],
+            },
+          });
+        },
+      );
+    });
+  });
 });
+
+function removeUndefined(jsonObj: Record<string, unknown>): unknown {
+  return JSON.parse(JSON.stringify(jsonObj));
+}

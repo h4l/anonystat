@@ -1,6 +1,6 @@
 import { Wildcard } from "../_cors.ts";
 import { GA4MP_URL } from "../constants.ts";
-import { z } from "../deps.ts";
+import { equal, z } from "../deps.ts";
 import { formatSlashDelimitedRegexString } from "./cors_schemas.ts";
 import {
   Config,
@@ -26,10 +26,16 @@ function omitDefault<T>(value: T, default_: T): T | undefined {
 }
 
 function simplifyCors(
-  value: z.infer<typeof Cors>,
+  value: Cors = {},
+  base: Cors = {},
 ): z.input<typeof Cors> | undefined {
-  const result: z.input<typeof Cors> = {
-    allow_origin: value.allow_origin === Wildcard
+  const result: z.input<typeof Cors> = {};
+
+  if (
+    !equal(value.allow_origin, base.allow_origin) &&
+    value.allow_origin !== undefined
+  ) {
+    result.allow_origin = value.allow_origin === Wildcard
       ? "*"
       : value.allow_origin instanceof RegExp
       ? formatSlashDelimitedRegexString(value.allow_origin)
@@ -37,14 +43,16 @@ function simplifyCors(
       ? value.allow_origin.map((o) =>
         o.startsWith("https://") ? o.substring(8) : o
       )
-      : value.allow_origin,
-    max_age:
-      (value.max_age !== undefined && value.max_age !== DEFAULT_CORS_MAX_AGE)
-        ? value.max_age
-        : undefined,
-  };
-  if (result.allow_origin === undefined) delete result.allow_origin;
-  if (result.max_age === undefined) delete result.max_age;
+      : value.allow_origin;
+  }
+
+  if (
+    value.max_age !== (base.max_age ?? DEFAULT_CORS_MAX_AGE) &&
+    value.max_age !== undefined
+  ) {
+    result.max_age = value.max_age;
+  }
+
   return result.allow_origin === undefined && result.max_age === undefined
     ? undefined
     : result;
@@ -52,8 +60,9 @@ function simplifyCors(
 
 function simplifyDataStreamConfig(
   value: z.infer<typeof DataStreamInOut>,
+  base: { cors?: Cors },
 ): z.input<typeof DataStreamInOutShorthand> {
-  const cors = value.in.cors && simplifyCors(value.in.cors);
+  const cors = simplifyCors(value.in.cors, base.cors);
   if (
     value.in.api_secret === value.out.api_secret &&
     value.in.measurement_id === value.out.measurement_id
@@ -106,15 +115,65 @@ function simplifyUserIdConfig(
   return undefined;
 }
 
+function mergeOverrides<T extends unknown>(
+  base: T | undefined,
+  overrides: Array<T | undefined>,
+): T | undefined {
+  const allOverridesEqual = overrides.every((o) =>
+    equal(o ?? base, overrides[0] ?? base)
+  );
+  if (allOverridesEqual) return overrides[0] ?? base;
+
+  const anyOverrideDependsOnBase = overrides.some((o) =>
+    equal(base, o ?? base)
+  );
+  if (anyOverrideDependsOnBase) return base;
+  return undefined;
+}
+
+/** Get the base cors value to use, given the data_stream cors overrides.
+ *
+ * - If all the overrides resolve to the same value, the value is propagated up
+ *    to the base cors so that the duplicate values in each data stream will be
+ *    eliminated when simplifying.
+ * - If all data_stream values override the base value, we drop the base value
+ *    (as it has no effect)
+ * -
+ */
+function mergeCorsOverrides(
+  baseCors: Cors = {},
+  dataStreamInCors: Array<Cors | undefined>,
+): Cors {
+  return {
+    allow_origin: mergeOverrides(
+      baseCors.allow_origin,
+      dataStreamInCors.map((c) => c?.allow_origin),
+    ),
+    max_age: mergeOverrides(
+      baseCors.max_age,
+      dataStreamInCors.map((c) => c?.max_age),
+    ),
+  };
+}
+
 function simplifyForwarderConfig(
   value: z.infer<typeof ForwarderConfig>,
 ): z.input<typeof ForwarderConfig> {
-  const data_stream = value.data_stream.map(simplifyDataStreamConfig);
+  const mergedCors = mergeCorsOverrides(
+    value.cors,
+    value.data_stream.map((ds) => ds.in.cors),
+  );
+
+  const cors = simplifyCors(mergedCors);
+  const data_stream = value.data_stream.map((ds) =>
+    simplifyDataStreamConfig(ds, { cors: mergedCors })
+  );
   return {
     data_stream: data_stream.length === 1 ? data_stream[0] : data_stream,
     user_id: value.user_id ? simplifyUserIdConfig(value.user_id) : undefined,
     allow_debug: omitDefault(value.allow_debug, false),
     destination: omitDefault(value.destination, GA4MP_URL),
+    ...(cors && { cors }),
   };
 }
 

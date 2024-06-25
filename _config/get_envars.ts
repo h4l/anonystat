@@ -37,6 +37,8 @@ export function getEnvars(
     ANONYSTAT_DESTINATION: forward.destination,
     ANONYSTAT_LISTEN_HOSTNAME: simplified.listen?.hostname,
     ANONYSTAT_LISTEN_PORT: stringOrUndefined(simplified.listen?.port),
+    ANONYSTAT_CORS_ALLOW_ORIGIN: stringOrUndefined(forward.cors?.allow_origin),
+    ANONYSTAT_CORS_MAX_AGE: stringOrUndefined(forward.cors?.max_age),
   };
 
   if ("measurement_id" in data_stream) {

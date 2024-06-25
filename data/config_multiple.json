@@ -5,7 +5,12 @@
                 {
                     "in": {
                         "measurement_id": "mid1",
-                        "api_secret": "defaultsecret999"
+                        "api_secret": "defaultsecret999",
+                        "cors": {
+                            "allow_origin": [
+                                "localhost"
+                            ]
+                        }
                     },
                     "out": {
                         "measurement_id": "midout1",
@@ -29,6 +34,10 @@
                 "scrambling_secret": "foobarbaz4",
                 "lifetime": "2 weeks",
                 "existing": "scramble"
+            },
+            "cors": {
+                "allow_origin": "/https://.+\\.example.com/",
+                "max_age": 300
             }
         },
         {

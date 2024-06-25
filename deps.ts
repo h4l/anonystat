@@ -9,3 +9,4 @@ export { parse as parseJsonc } from "https://deno.land/std@0.221.0/jsonc/mod.ts"
 export type { JsonValue } from "https://deno.land/std@0.221.0/jsonc/mod.ts";
 export { generate } from "https://deno.land/std@0.221.0/uuid/v5.ts";
 export type { Closer } from "https://deno.land/std@0.221.0/io/types.ts";
+export { equal } from "https://deno.land/std@0.221.0/assert/equal.ts";

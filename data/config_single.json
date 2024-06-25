@@ -20,7 +20,13 @@
       "existing": "replace"
     },
     "destination": "https://example.com/mp/collect",
-    "allow_debug": true
+    "allow_debug": true,
+    "cors": {
+      "allow_origin": [
+        "example.com"
+      ],
+      "max_age": 120
+    }
   },
   "listen": {
     "port": 9000,
