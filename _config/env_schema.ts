@@ -2,6 +2,11 @@ import { ExistingIdPolicy } from "../anonymisation.ts";
 import { DestinationUrl, Host, Port, ScramblerKey } from "./values_schema.ts";
 import { EvaluatedDisambiguatedLifetimeExpression } from "./lifetimes.ts";
 import { z } from "../deps.ts";
+import {
+  EvaluatedOriginsExpression,
+  MaxAge,
+  WildcardSchema,
+} from "./cors_schemas.ts";
 
 function isTrue(value: string): boolean {
   return value.toLowerCase() === "true";
@@ -18,12 +23,18 @@ const DecimalIntFromString = z.string().regex(/^(0|[1-9][0-9]*)$/, {
   (i) => parseInt(i),
 );
 
+const AllowOriginEnvar = z.union([WildcardSchema, EvaluatedOriginsExpression]);
+
 /** Names of config envars used individually. */
 export enum ConfigEnvars {
   show_config = "ANONYSTAT_SHOW_CONFIG",
   config_source = "ANONYSTAT_CONFIG_SOURCE",
   config = "ANONYSTAT_CONFIG",
   config_file = "ANONYSTAT_CONFIG_FILE",
+}
+
+function emptyStringAsUndefined<SchemaT extends z.ZodTypeAny>(schema: SchemaT) {
+  return EmptyStringAsUndefined.pipe(schema.optional()).optional();
 }
 
 export const RawConfigEnv = z.object({
@@ -43,6 +54,8 @@ export const RawConfigEnv = z.object({
   ).optional(),
   ANONYSTAT_USER_ID_EXISTING: EmptyStringAsUndefined.pipe(ExistingIdPolicy)
     .optional(),
+  ANONYSTAT_CORS_ALLOW_ORIGIN: emptyStringAsUndefined(AllowOriginEnvar),
+  ANONYSTAT_CORS_MAX_AGE: emptyStringAsUndefined(MaxAge),
   ANONYSTAT_LISTEN_PORT: EmptyStringAsUndefined.pipe(DecimalIntFromString).pipe(
     Port,
   ).optional(),

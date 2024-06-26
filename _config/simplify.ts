@@ -1,9 +1,13 @@
+import { Wildcard } from "../_cors.ts";
 import { GA4MP_URL } from "../constants.ts";
 import { z } from "../deps.ts";
+import { formatSlashDelimitedRegexString } from "./cors_schemas.ts";
 import {
   Config,
+  Cors,
   DataStreamInOut,
   DataStreamInOutShorthand,
+  DEFAULT_CORS_MAX_AGE,
   DEFAULT_EXISTING_POLICY,
   DEFAULT_HOSTNAME,
   DEFAULT_LIFETIME_UNIT,
@@ -21,9 +25,35 @@ function omitDefault<T>(value: T, default_: T): T | undefined {
   return value === default_ ? undefined : value;
 }
 
+function simplifyCors(
+  value: z.infer<typeof Cors>,
+): z.input<typeof Cors> | undefined {
+  const result: z.input<typeof Cors> = {
+    allow_origin: value.allow_origin === Wildcard
+      ? "*"
+      : value.allow_origin instanceof RegExp
+      ? formatSlashDelimitedRegexString(value.allow_origin)
+      : Array.isArray(value.allow_origin)
+      ? value.allow_origin.map((o) =>
+        o.startsWith("https://") ? o.substring(8) : o
+      )
+      : value.allow_origin,
+    max_age:
+      (value.max_age !== undefined && value.max_age !== DEFAULT_CORS_MAX_AGE)
+        ? value.max_age
+        : undefined,
+  };
+  if (result.allow_origin === undefined) delete result.allow_origin;
+  if (result.max_age === undefined) delete result.max_age;
+  return result.allow_origin === undefined && result.max_age === undefined
+    ? undefined
+    : result;
+}
+
 function simplifyDataStreamConfig(
   value: z.infer<typeof DataStreamInOut>,
 ): z.input<typeof DataStreamInOutShorthand> {
+  const cors = value.in.cors && simplifyCors(value.in.cors);
   if (
     value.in.api_secret === value.out.api_secret &&
     value.in.measurement_id === value.out.measurement_id
@@ -31,9 +61,17 @@ function simplifyDataStreamConfig(
     return {
       api_secret: value.in.api_secret,
       measurement_id: value.in.measurement_id,
+      ...(cors && { cors }),
     };
   }
-  return { in: { ...value.in }, out: { ...value.out } };
+  return {
+    in: {
+      api_secret: value.in.api_secret,
+      measurement_id: value.in.measurement_id,
+      ...(cors && { cors }),
+    },
+    out: { ...value.out },
+  };
 }
 
 function simplifyLifetimeObject(

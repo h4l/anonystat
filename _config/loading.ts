@@ -10,8 +10,10 @@ import {
 import {
   Config,
   ConfigInput,
+  Cors,
   DataStreamCredentials,
   DataStreamInOut,
+  formatAllowOriginJson,
   ListenConfig,
   UserIdConfig,
 } from "./json_schema.ts";
@@ -270,6 +272,16 @@ function loadConfigEnv(rawEnv: EnvMap): Result<Config, LoadConfigError> {
     out: data_stream_out,
   };
 
+  let cors: z.input<typeof Cors> | undefined = {
+    allow_origin: env.ANONYSTAT_CORS_ALLOW_ORIGIN === undefined
+      ? undefined
+      : formatAllowOriginJson(env.ANONYSTAT_CORS_ALLOW_ORIGIN),
+    max_age: env.ANONYSTAT_CORS_MAX_AGE,
+  };
+  if (cors.allow_origin === undefined && cors.max_age === undefined) {
+    cors = undefined;
+  }
+
   const listen: z.input<typeof ListenConfig> = {
     port: env.ANONYSTAT_LISTEN_PORT,
     hostname: env.ANONYSTAT_LISTEN_HOSTNAME || undefined,
@@ -298,6 +310,7 @@ function loadConfigEnv(rawEnv: EnvMap): Result<Config, LoadConfigError> {
       user_id,
       allow_debug: env.ANONYSTAT_ALLOW_DEBUG,
       destination: env.ANONYSTAT_DESTINATION || undefined,
+      ...(cors ? { cors } : {}),
     },
     listen: (listen.port === undefined && listen.hostname === undefined)
       ? undefined

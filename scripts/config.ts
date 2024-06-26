@@ -296,6 +296,18 @@ export async function loadConfigWithOverrides(
       case "ANONYSTAT_LISTEN_HOSTNAME":
         config.listen.hostname = result.data.ANONYSTAT_LISTEN_HOSTNAME!;
         break;
+      case "ANONYSTAT_CORS_ALLOW_ORIGIN":
+        eachForward((f) => {
+          f.cors = f.cors ?? {};
+          f.cors.allow_origin = result.data.ANONYSTAT_CORS_ALLOW_ORIGIN;
+        });
+        break;
+      case "ANONYSTAT_CORS_MAX_AGE":
+        eachForward((f) => {
+          f.cors = f.cors ?? {};
+          f.cors.max_age = result.data.ANONYSTAT_CORS_MAX_AGE;
+        });
+        break;
       default:
         assertUnreachable(name);
     }

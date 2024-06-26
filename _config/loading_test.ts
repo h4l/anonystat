@@ -23,6 +23,7 @@ import {
 } from "../dev_deps.ts";
 import { JsonValue } from "../deps.ts";
 import { TemporaryFile } from "../_testing/tempfile.ts";
+import { Wildcard } from "../_cors.ts";
 
 // deno-lint-ignore no-explicit-any
 type Broken = any;
@@ -89,6 +90,10 @@ Deno.test("loadConfig()", async (t) => {
           unit: "weeks",
         },
       },
+      cors: {
+        allow_origin: ["https://example.com"],
+        max_age: 10 * 60,
+      },
     }],
     listen: {
       hostname: "1.2.3.4",
@@ -124,10 +129,30 @@ Deno.test("loadConfig()", async (t) => {
           ANONYSTAT_USER_ID_EXISTING: "keep",
           ANONYSTAT_USER_ID_LIFETIME: "2 weeks",
           ANONYSTAT_USER_ID_SCRAMBLING_SECRET: "hunter2",
+          ANONYSTAT_CORS_ALLOW_ORIGIN: "example.com",
+          ANONYSTAT_CORS_MAX_AGE: "10 minutes",
         }),
       });
       assertSuccessful(configLoad);
       assertEquals(configLoad.data, fullConfig());
+    });
+
+    await t.step("empty envars are undefined", async () => {
+      const configLoad = await loadConfig({
+        env: envMap<Record<ConfigValueEnvarName, string>>({
+          // FIXME: the rest of these can't currently be empty strings
+          ANONYSTAT_DATA_STREAM_IN_API_SECRET: "",
+          ANONYSTAT_DATA_STREAM_OUT_API_SECRET: "",
+          ANONYSTAT_DATA_STREAM_API_SECRET: "hunter2",
+          ANONYSTAT_DATA_STREAM_IN_MEASUREMENT_ID: "",
+          ANONYSTAT_DATA_STREAM_OUT_MEASUREMENT_ID: "",
+          ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "abc123",
+          ANONYSTAT_CORS_ALLOW_ORIGIN: "",
+          ANONYSTAT_CORS_MAX_AGE: "",
+        }),
+      });
+      assertSuccessful(configLoad);
+      assertEquals(configLoad.data, minimalConfig());
     });
 
     await t.step(
@@ -148,6 +173,65 @@ Deno.test("loadConfig()", async (t) => {
         });
       },
     );
+
+    await t.step("ANONYSTAT_CORS_ALLOW_ORIGIN", async (t) => {
+      await t.step("can be wildcard", async () => {
+        const configLoad = await loadConfig({
+          env: envMap({
+            ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
+            ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
+            ANONYSTAT_CORS_ALLOW_ORIGIN: "*",
+          }),
+        });
+        assertSuccessful(configLoad);
+        assertEquals(configLoad.data.forward[0].cors?.allow_origin, Wildcard);
+      });
+
+      await t.step("can be comma-separated list of origins", async () => {
+        const configLoad = await loadConfig({
+          env: envMap({
+            ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
+            ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
+            ANONYSTAT_CORS_ALLOW_ORIGIN:
+              "https://foo.com,bar.com:8000,http://localhost:9000",
+          }),
+        });
+        assertSuccessful(configLoad);
+        assertEquals(configLoad.data.forward[0].cors?.allow_origin, [
+          "https://foo.com",
+          "https://bar.com:8000",
+          "http://localhost:9000",
+        ]);
+      });
+
+      await t.step("can be a slash-delimited regex", async () => {
+        const configLoad = await loadConfig({
+          env: envMap({
+            ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
+            ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
+            ANONYSTAT_CORS_ALLOW_ORIGIN: "/http://(\\.+\\.)localhost/",
+          }),
+        });
+        assertSuccessful(configLoad);
+        assertEquals(
+          configLoad.data.forward[0].cors?.allow_origin,
+          /http:\/\/(\.+\.)localhost/,
+        );
+      });
+
+      await t.step("empty value is undefined", async () => {
+        const configLoad = await loadConfig({
+          env: envMap({
+            ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
+            ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
+            ANONYSTAT_CORS_ALLOW_ORIGIN: "",
+            // ANONYSTAT_LISTEN_PORT: "",
+          }),
+        });
+        assertSuccessful(configLoad);
+        assertEquals(configLoad.data.forward[0].cors?.allow_origin, undefined);
+      });
+    });
   });
 
   await t.step("from json", async (t) => {
@@ -193,6 +277,10 @@ Deno.test("loadConfig()", async (t) => {
               count: 2,
               unit: "weeks",
             },
+          },
+          cors: {
+            allow_origin: ["example.com"],
+            max_age: "10 minutes",
           },
         },
         listen: {
@@ -245,6 +333,69 @@ Deno.test("loadConfig()", async (t) => {
       assertEquals(forward[0].data_stream[1].in.measurement_id, "b");
       assertEquals(forward[1].data_stream[0].in.measurement_id, "c");
       assertEquals(forward[1].data_stream[1].in.measurement_id, "d");
+    });
+
+    await t.step("data_stream with cors override", async () => {
+      const config: ConfigInput = {
+        forward: [
+          {
+            data_stream: [
+              {
+                measurement_id: "a",
+                api_secret: "1",
+                cors: {
+                  allow_origin: "*",
+                  max_age: "30 seconds",
+                },
+              },
+              {
+                in: {
+                  measurement_id: "b",
+                  api_secret: "2",
+                  cors: {
+                    allow_origin: ["b.example.com"],
+                    max_age: "2 minutes",
+                  },
+                },
+                out: {
+                  measurement_id: "out-b",
+                  api_secret: "out-b",
+                },
+              },
+            ],
+          },
+          {
+            data_stream: {
+              measurement_id: "c",
+              api_secret: "3",
+              cors: {
+                allow_origin: "/https://.*\\.example\\.com/",
+                max_age: "2 hour",
+              },
+            },
+          },
+        ],
+      };
+      const configLoad = await loadConfig({
+        env: envMap({
+          ANONYSTAT_CONFIG: `/* JSONC can have comments */ ${
+            JSON.stringify(config)
+          }`,
+        }),
+      });
+      assertSuccessful(configLoad);
+      assertEquals(configLoad.data.forward[0].data_stream[0].in.cors, {
+        allow_origin: Wildcard,
+        max_age: 30,
+      });
+      assertEquals(configLoad.data.forward[0].data_stream[1].in.cors, {
+        allow_origin: ["https://b.example.com"],
+        max_age: 2 * 60,
+      });
+      assertEquals(configLoad.data.forward[1].data_stream[0].in.cors, {
+        allow_origin: /https:\/\/.*\.example\.com/,
+        max_age: 2 * 60 * 60,
+      });
     });
   });
 

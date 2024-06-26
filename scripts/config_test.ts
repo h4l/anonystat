@@ -175,6 +175,8 @@ Deno.test("-e/--override", async (t) => {
         ANONYSTAT_USER_ID_EXISTING: "keep",
         ANONYSTAT_USER_ID_LIFETIME: "R/2024-01-01/P1W",
         ANONYSTAT_USER_ID_SCRAMBLING_SECRET: "osec",
+        ANONYSTAT_CORS_ALLOW_ORIGIN: "example.com",
+        ANONYSTAT_CORS_MAX_AGE: "1 hour",
       };
       const a = await run({
         // config_single has a value for every field

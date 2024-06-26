@@ -13,21 +13,63 @@ import {
   EvaluatedDisambiguatedLifetimeExpression,
   LifetimeObject,
 } from "./lifetimes.ts";
+import {
+  formatSlashDelimitedRegexString,
+  MaxAge,
+  OriginShorthand,
+  SlashDelimitedRegexString,
+  WildcardSchema,
+} from "./cors_schemas.ts";
+import { Wildcard } from "../_cors.ts";
+
+export const DEFAULT_CORS_MAX_AGE = 5 * 60;
+
+const AllowOriginJson = z.union([
+  SlashDelimitedRegexString,
+  WildcardSchema,
+  OriginShorthand.array(),
+  z.null(),
+]);
+
+export function formatAllowOriginJson(
+  value: z.infer<typeof AllowOriginJson>,
+): z.input<typeof AllowOriginJson> {
+  return value === Wildcard
+    ? "*"
+    : value instanceof RegExp
+    ? formatSlashDelimitedRegexString(value)
+    : value;
+}
+
+export const Cors = z.object({
+  allow_origin: AllowOriginJson.optional(),
+  max_age: MaxAge.optional(),
+});
+export type Cors = z.infer<typeof Cors>;
 
 export const DataStreamCredentials = z.object({
   api_secret: NonEmptyString,
   measurement_id: NonEmptyString,
 });
 
+export const InDataStreamCredentials = DataStreamCredentials.extend({
+  cors: Cors.optional(),
+});
+
 export const DataStreamInOut = z.object({
-  in: DataStreamCredentials,
+  in: InDataStreamCredentials,
   out: DataStreamCredentials,
 });
 export type DataStreamInOut = z.infer<typeof DataStreamInOut>;
 
-export const DataStreamInOutShorthand = DataStreamCredentials.transform((
-  ds,
-): DataStreamInOut => ({ in: { ...ds }, out: { ...ds } })).or(DataStreamInOut);
+export const DataStreamInOutShorthand = InDataStreamCredentials.transform((
+  { cors, ...ds },
+): DataStreamInOut => ({
+  in: { ...ds, ...(cors && { cors }) },
+  out: { ...ds },
+})).or(
+  DataStreamInOut,
+);
 
 export const DEFAULT_LIFETIME_UNIT: TimeUnit = "months";
 export const DEFAULT_EXISTING_POLICY: ExistingIdPolicy =
@@ -45,6 +87,7 @@ export const ForwarderConfig = z.object({
   destination: DestinationUrl.default(GA4MP_URL),
   allow_debug: z.boolean().default(false),
   user_id: UserIdConfig.default({}),
+  cors: Cors.optional(),
 });
 export type ForwarderConfig = z.infer<typeof ForwarderConfig>;
 

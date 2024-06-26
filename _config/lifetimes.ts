@@ -114,7 +114,7 @@ export const ParsedIsoIntervalLifetime = z.string().transform(
 );
 
 /** A string that parses to a Lifetime, like "day" "1 month", or "2 quarters". */
-const ParsedSimpleLifetimeExpression = z.string().transform(
+export const ParsedSimpleLifetimeExpression = z.string().transform(
   (expr, ctx): ParsedLifetimeExpression => {
     const match = /^(?:([1-9]\d*)\s*)?([a-zA-Z]+)$/.exec(expr.trim());
     if (match) {
