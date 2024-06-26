@@ -197,7 +197,27 @@ format. See the [`data/config_*`](./data/) files for some examples.
     // If true, events can be sent to the /debug/mp/collect path, in addition to
     // the regular /mp/collect path for the the above measurement_id(s).
     // The debug path shows validation error details for invalid event payloads.
-    "allow_debug": true
+    "allow_debug": true,
+    // Respond with CORS headers to allow browsers to make AJAX requests. By
+    // default CORS is not enabled. CORS options here apply to all data streams
+    // configured within this forward section. Individual data streams can also
+    // have an identical "cors" property within their "in" section, to override
+    // CORS for a specific data stream.
+    "cors": {
+      // The origin(s) to allow. Can be:
+      // - "*" to match any origin
+      // - an array of literal origin values, e.g:
+      //   ["http://localhost", "example.com"]. https:// is assumed if origins
+      //   have no scheme.
+      // - a regular expression that matches the entire origin header. Regex
+      //   strings must start and end with '/' to distinguish them, but '/'
+      //   within the value is not escaped.
+      // - null — to explicitly disable CORS
+      "allow_origin": "/https://.+\\.example.com/",
+      // The number of seconds that browsers may cache the CORS options of the
+      // URL. Default is 300 (5 minutes).
+      "max_age": 3600
+    }
   },
   // Control the TCP socket Anonystat opens to listen for HTTP requests. This is
   // not needed when deploying to Deno Deploy.
