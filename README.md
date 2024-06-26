@@ -19,6 +19,30 @@ Analytics.
 
 Anonystat is new and probably has some rough edges!
 
+## Features
+
+- Generate anonymous `user_id` values for event payloads without browser cookies
+  - Anonystat generates IDs by hashing:
+    - User IP address, browser user agent and language headers
+    - A secret that's re-generated after a fixed time interval (e.g. weekly or
+      monthly)
+    - An optional additional secret from the deployment configuration
+- Scramble `user_id` values provided in event payloads to un-link browser IDs
+  from analytics IDs
+  - Generating a random `user_id` client-side and storing them in session
+    storage is arguably more private than not storing an identifier and relying
+    on IP hashing, as the ID stored in analytics data has absolutely no link to
+    user data.
+- Validate GA4 MP event payloads to catch errors
+- Hide actual Google Analytics tag ID from public view
+- No need for client-side to include a 3rd-party tracking script
+  - For example, this
+    [tutorial on using Google Analytics 4 in a Chrome Extension] shows how to
+    send events just using `fetch()` calls.
+
+[tutorial on using Google Analytics 4 in a Chrome
+    Extension]: https://developer.chrome.com/docs/extensions/how-to/integrate/google-analytics-4
+
 ## Deploy
 
 To manage a long-term deployment, create yourself a copy of the
@@ -107,30 +131,6 @@ HTTP/2 204
 [Deno Deploy Quick Start]: https://docs.deno.com/deploy/manual
 [Google Analytics dashboard]: https://analytics.google.com/
 [Event Builder]: https://ga-dev-tools.google/ga4/event-builder/
-
-## Features
-
-- Generate anonymous `user_id` values for event payloads without browser cookies
-  - Anonystat generates IDs by hashing:
-    - User IP address, browser user agent and language headers
-    - A secret that's re-generated after a fixed time interval (e.g. weekly or
-      monthly)
-    - An optional additional secret from the deployment configuration
-- Scramble `user_id` values provided in event payloads to un-link browser IDs
-  from analytics IDs
-  - Generating a random `user_id` client-side and storing them in session
-    storage is arguably more private than not storing an identifier and relying
-    on IP hashing, as the ID stored in analytics data has absolutely no link to
-    user data.
-- Validate GA4 MP event payloads to catch errors
-- Hide actual Google Analytics tag ID from public view
-- No need for client-side to include a 3rd-party tracking script
-  - For example, this
-    [tutorial on using Google Analytics 4 in a Chrome Extension] shows how to
-    send events just using `fetch()` calls.
-
-[tutorial on using Google Analytics 4 in a Chrome
-    Extension]: https://developer.chrome.com/docs/extensions/how-to/integrate/google-analytics-4
 
 ## Configuration
 
