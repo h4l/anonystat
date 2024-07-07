@@ -8,14 +8,21 @@ and this project adheres to
 
 ## Unreleased
 
+## [0.3.0] - 2024-07-07
+
+### Added
+
+- The CORS allow origin config now allows literal URLs with non-standard
+  schemes, such as chrome-extension:// or moz-extension://.
+  (https://github.com/h4l/anonystat/pull/4)
+
 ## [0.2.0] - 2024-06-26
 
 ### Added
 
 - Support for CORS requests — data streams can configure HTTP origins allowed to
   make CORS requests, which enables browsers to submit events using AJAX and
-  `navigator.sendBeacon()` requests.
-  [#3](https://github.com/h4l/anonystat/pull/3)
+  `navigator.sendBeacon()` requests. (https://github.com/h4l/anonystat/pull/3)
 
 ## [0.1.0] — 2024-05-20
 
