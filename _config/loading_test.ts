@@ -231,7 +231,6 @@ Deno.test("loadConfig()", async (t) => {
             ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
             ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
             ANONYSTAT_CORS_ALLOW_ORIGIN: "",
-            // ANONYSTAT_LISTEN_PORT: "",
           }),
         });
         assertSuccessful(configLoad);
