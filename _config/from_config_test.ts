@@ -121,6 +121,14 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
             in: { measurement_id: "c_in", api_secret: "c_in_sec" },
             out: { measurement_id: "c_out", api_secret: "c_out_sec" },
           },
+          {
+            in: {
+              measurement_id: "d_in",
+              api_secret: "d_in_sec",
+              cors: { allow_origin: ["moz-extension://ab-cd"] },
+            },
+            out: { measurement_id: "d_out", api_secret: "d_out_sec" },
+          },
         ],
         allow_debug: true,
         destination: "https://other.example.com/mp/collect",
@@ -460,6 +468,19 @@ Deno.test("createCollectRequestMatcherFromConfig()", async (t) => {
         response: {
           status: StatusCodes.NO_CONTENT,
           allowOrigin: "*",
+          maxAge: 60 * 60,
+        },
+      },
+      {
+        name: "non-http origins are matched",
+        request: {
+          measurement_id: "d_in",
+          api_secret: "d_in_sec",
+          origin: "moz-extension://ab-cd",
+        },
+        response: {
+          status: StatusCodes.NO_CONTENT,
+          allowOrigin: "moz-extension://ab-cd",
           maxAge: 60 * 60,
         },
       },

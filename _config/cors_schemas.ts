@@ -80,8 +80,8 @@ export const SlashDelimitedRegexString = z.string().transform(
 );
 
 function parseOriginShorthand(val: string): Result<string, "invalid-origin"> {
-  // allow https:// to be omitted
-  const resolvedVal = /^https?:\/\//i.test(val) ? val : `https://${val}`;
+  // default to https:// if no scheme is specified
+  const resolvedVal = val.includes("://") ? val : `https://${val}`;
 
   let url: URL | undefined;
   try {
@@ -92,16 +92,38 @@ function parseOriginShorthand(val: string): Result<string, "invalid-origin"> {
 
   // Value is a valid origin if the parsed URL's origin is equal to the val.
   // i.e. the value does not contain anything beyond the origin component.
-  if (!url || url.origin !== resolvedVal) {
-    return { success: false, error: "invalid-origin" };
+  // e.g. https://user:name@example.com would be invalid, as user name is not
+  // part of an origin.
+  if (
+    url && (isUrlWithKnownSchemeAndOriginOnly(url, resolvedVal) ||
+      // We need to support URLs used by browser extensions: chrome-extension://
+      // and moz-extension:// . These are sent as Origin header values by web
+      // extensions, but the URL class does not recognise them, so we just
+      // validate that they have no path, query, hash.
+      isNonStandardUrlWithSchemeAuthorityOnly(url))
+  ) {
+    return { success: true, data: resolvedVal };
   }
-  return { success: true, data: resolvedVal };
+  return { success: false, error: "invalid-origin" };
+}
+
+function isUrlWithKnownSchemeAndOriginOnly(
+  parsedUrl: URL,
+  rawUrl: string,
+): boolean {
+  // non-standard? URLs have a 'null' origin.
+  return parsedUrl.origin !== "null" && parsedUrl.origin === rawUrl;
+}
+
+function isNonStandardUrlWithSchemeAuthorityOnly(url: URL): boolean {
+  return url.origin === "null" && url.pathname === "" && url.search === "" &&
+    url.hash === "";
 }
 
 type ParsedOriginsExpression = { expr: string; origins: RegExp | string[] };
 
 function formatOriginShorthandError(origin: string): string {
-  return `Origin values must be of the form [https?://]host.name, ${
+  return `Origin values must be of the form [<scheme>://]host.name[:<port>], ${
     JSON.stringify(origin)
   } is not valid.`;
 }

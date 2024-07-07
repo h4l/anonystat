@@ -199,7 +199,7 @@ Deno.test("loadConfig()", async (t) => {
             ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
             ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
             ANONYSTAT_CORS_ALLOW_ORIGIN:
-              "https://foo.com,bar.com:8000,http://localhost:9000",
+              "https://foo.com,bar.com:8000,http://localhost:9000,chrome-extension://abcd",
           }),
         });
         assertSuccessful(configLoad);
@@ -207,8 +207,40 @@ Deno.test("loadConfig()", async (t) => {
           "https://foo.com",
           "https://bar.com:8000",
           "http://localhost:9000",
+          "chrome-extension://abcd",
         ]);
       });
+
+      await t.step(
+        "cannot be literal URL with non-origin components",
+        async (t) => {
+          const invalidLiteralOrigins = [
+            "https://user:name@example.com",
+            "https://example.com/foo",
+            "chrome-extension://abcd?query",
+          ];
+
+          for (const invalidOrigin of invalidLiteralOrigins) {
+            await t.step(invalidOrigin, async () => {
+              const configLoad = await loadConfig({
+                env: envMap({
+                  ANONYSTAT_DATA_STREAM_MEASUREMENT_ID: "foo",
+                  ANONYSTAT_DATA_STREAM_API_SECRET: "bar",
+                  ANONYSTAT_CORS_ALLOW_ORIGIN: invalidOrigin,
+                }),
+              });
+              assertUnsuccessful(configLoad);
+              assertEquals(configLoad.error.name, "config-envars-invalid");
+              assert(configLoad.error.name === "config-envars-invalid");
+              assertStringIncludes(
+                configLoad.error.envarErrors.ANONYSTAT_CORS_ALLOW_ORIGIN
+                  ?.join() ?? "",
+                "Origin values must be of the form",
+              );
+            });
+          }
+        },
+      );
 
       await t.step("can be a slash-delimited regex", async () => {
         const configLoad = await loadConfig({
@@ -358,7 +390,7 @@ Deno.test("loadConfig()", async (t) => {
                   measurement_id: "b",
                   api_secret: "2",
                   cors: {
-                    allow_origin: ["b.example.com"],
+                    allow_origin: ["b.example.com", "chrome-extension://abcd"],
                     max_age: "2 minutes",
                   },
                 },
@@ -394,7 +426,7 @@ Deno.test("loadConfig()", async (t) => {
         max_age: 30,
       });
       assertEquals(configLoad.data.forward[0].data_stream[1].in.cors, {
-        allow_origin: ["https://b.example.com"],
+        allow_origin: ["https://b.example.com", "chrome-extension://abcd"],
         max_age: 2 * 60,
       });
       assertEquals(configLoad.data.forward[1].data_stream[0].in.cors, {
